@@ -1880,13 +1880,6 @@ function render() {
         <button class="check-link" style="background:linear-gradient(135deg,#f093fb,#f5576c);color:white;" onclick="openDomainAI('${d.domain}')" title="AI Tools per domain">🤖</button>
         <button class="check-link" style="background:#6366f1;color:white;" onclick="openEditDomain('${d.domain}')" title="Edit full">✏️</button>
         <button class="check-link copy-btn" onclick="copyDomain('${d.domain}')" title="Copy domain">📋</button>
-        <a class="check-link ah" href="https://ahrefs.com/backlink-checker/?input=${encodeURIComponent(d.domain)}&mode=subdomains" target="_blank" title="Ahrefs">AH</a>
-        <a class="check-link dc" href="https://www.domcop.com/domains?dataSource=live&domain=${encodeURIComponent(d.domain)}" target="_blank" title="DomCop">DC</a>
-        <a class="check-link dp" href="https://www.dapachecker.org/" target="_blank" title="DAPAChecker">DP</a>
-        <a class="check-link mz" href="https://moz.com/domain-analysis?site=${encodeURIComponent(d.domain)}" target="_blank" title="Moz">MZ</a>
-        <a class="check-link nw" href="https://trustpositif.komdigi.go.id/?domain=${encodeURIComponent(d.domain)}" target="_blank" title="Nawala">NW</a>
-        <a class="check-link" style="background:#0891b2;color:white;padding:2px 6px;" href="https://web.archive.org/web/2024*/${encodeURIComponent(d.domain)}" target="_blank" title="Wayback Machine">WB</a>
-        <a class="check-link" style="background:#475569;color:white;padding:2px 6px;" href="https://www.whois.com/whois/${encodeURIComponent(d.domain)}" target="_blank" title="WHOIS">WH</a>
         <button class="check-link delete-btn" onclick="deleteDomain('${d.domain}')" title="Delete (bisa di-restore)">🗑</button>
         <button class="check-link" style="background:linear-gradient(135deg,#34d399,#fbbf24);color:white;" onclick="openProp('${d.domain}')" title="🏠 Property: Deal, Tags, Expiry, Pin">🏠</button>
         <button class="check-link" style="background:#7f1d1d;color:white;" onclick="deleteDomainPermanent('${d.domain}')" title="Hapus Permanen (tidak bisa di-restore)">💀</button>
