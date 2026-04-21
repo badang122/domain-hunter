@@ -5850,7 +5850,8 @@ function pasteParseAndImport() {
 function pasteDoImport(rows) {
   if (!rows || rows.length === 0) { toast('Tidak ada domain valid untuk diimport', 'warn'); return; }
   const custom = JSON.parse(localStorage.getItem('dashboard_custom_domains') || '[]');
-  let added = 0, updated = 0;
+  const deleted = JSON.parse(localStorage.getItem('dashboard_deleted_domains') || '[]');
+  let added = 0, updated = 0, restored = 0;
   const addedDomains = [];
   rows.forEach(p => {
     const dom = p.domain.toLowerCase().trim();
@@ -5858,22 +5859,37 @@ function pasteDoImport(rows) {
       da: p.da||0, pa: p.pa||0, dr: p.dr||0, ur: p.ur||0,
       ss: p.ss||0, bl: p.bl||'', rd: p.rd||'', age: p.age||0
     };
+    // Kalau domain di deleted list, hapus dari deleted (restore)
+    const delIdx = deleted.indexOf(dom);
+    if (delIdx >= 0) { deleted.splice(delIdx, 1); restored++; }
+
     const existingAll = allData.find(x => x.domain === dom);
     const existingCustom = custom.findIndex(x => x.domain === dom);
-    if (existingAll || existingCustom >= 0) {
-      if (existingAll) Object.assign(existingAll, newData);
+
+    if (existingAll) {
+      // Di allData → update di-place
+      Object.assign(existingAll, newData);
       if (existingCustom >= 0) Object.assign(custom[existingCustom], newData);
+      else custom.unshift({ domain: dom, ...newData, nawala: '', notes: '', status: 'new', custom: true });
       saveMeta(dom, newData);
       updated++;
+    } else if (existingCustom >= 0) {
+      // Di custom tapi gak di allData (bug state) → push ke allData + update custom
+      Object.assign(custom[existingCustom], newData);
+      allData.unshift({ ...custom[existingCustom] });
+      saveMeta(dom, newData);
+      added++; addedDomains.push(dom);
     } else {
+      // Benar-benar baru
       const entry = { domain: dom, ...newData, nawala: '', notes: '', status: 'new', custom: true };
       custom.unshift(entry); allData.unshift(entry);
       added++; addedDomains.push(dom);
     }
   });
+  localStorage.setItem('dashboard_deleted_domains', JSON.stringify(deleted));
   localStorage.setItem('dashboard_custom_domains', JSON.stringify(custom));
-  if (typeof logActivity === 'function') logActivity('PASTE_IMPORT', `${added} added, ${updated} updated`);
-  console.log('[PasteImport]', { added, updated, addedDomains, totalNow: allData.length });
+  if (typeof logActivity === 'function') logActivity('PASTE_IMPORT', `${added} added, ${updated} updated, ${restored} restored`);
+  console.log('[PasteImport]', { added, updated, restored, addedDomains, totalNow: allData.length });
   closePasteImport();
   // Reset filter kalau import hasilnya tidak kelihatan karena filter aktif
   const prevCount = filteredData.length;
@@ -6107,6 +6123,7 @@ Mulai extract:`;
     // Auto-import mode: langsung import semua tanpa preview
     if (autoImport) {
       const custom = JSON.parse(localStorage.getItem('dashboard_custom_domains') || '[]');
+      const deleted = JSON.parse(localStorage.getItem('dashboard_deleted_domains') || '[]');
       let added = 0, updated = 0, invalid = 0;
       const addedList = [], updatedList = [];
       parsed.forEach(p => {
@@ -6123,20 +6140,27 @@ Mulai extract:`;
           rd: refList || rdCount,
           age: parseInt(p.age)||0
         };
-        // Cek existing — kalau ada, UPDATE metrics-nya
+        // Un-delete kalau domain di deleted list
+        const delIdx = deleted.indexOf(dom);
+        if (delIdx >= 0) deleted.splice(delIdx, 1);
         const existingAll = allData.find(x => x.domain === dom);
         const existingCustom = custom.findIndex(x => x.domain === dom);
-        if (existingAll || existingCustom >= 0) {
-          if (existingAll) Object.assign(existingAll, newData);
+        if (existingAll) {
+          Object.assign(existingAll, newData);
           if (existingCustom >= 0) Object.assign(custom[existingCustom], newData);
-          saveMeta(dom, newData);
-          updated++; updatedList.push(dom);
+          else custom.unshift({ domain: dom, ...newData, nawala: '', notes: '', status: 'new', custom: true });
+          saveMeta(dom, newData); updated++; updatedList.push(dom);
+        } else if (existingCustom >= 0) {
+          Object.assign(custom[existingCustom], newData);
+          allData.unshift({ ...custom[existingCustom] });
+          saveMeta(dom, newData); added++; addedList.push(dom);
         } else {
           const entry = { domain: dom, ...newData, nawala: '', notes: '', status: 'new', custom: true };
-          custom.push(entry); allData.push(entry);
+          custom.unshift(entry); allData.unshift(entry);
           added++; addedList.push(dom);
         }
       });
+      localStorage.setItem('dashboard_deleted_domains', JSON.stringify(deleted));
       localStorage.setItem('dashboard_custom_domains', JSON.stringify(custom));
       if (typeof logActivity === 'function') logActivity('SCREENSHOT_AUTO_IMPORT', `${added} added, ${updated} updated, ${invalid} invalid`);
       closeScreenshot();
