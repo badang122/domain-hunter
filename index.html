@@ -1583,12 +1583,10 @@ mydomain.net"></textarea>
       <button onclick="openSettings()">⚙️ Settings</button>
       <button class="btn-primary" onclick="openAI()">🤖 AI</button>
       <button class="btn-success" onclick="openCharts()">📊 Charts</button>
-      <button class="btn-warn" onclick="openCompare()">⚖️ Compare</button>
       <button onclick="openLeaderboard()" style="background:linear-gradient(135deg,#fbbf24,#f97316);color:white;font-weight:700;">🏆 Leaderboard</button>
       <button onclick="openBulkImport()" style="background:linear-gradient(135deg,#059669,#047857);color:white;">📥 Import Excel</button>
       <button onclick="openScreenshot()" style="background:linear-gradient(135deg,#3b82f6,#1e40af);color:white;">📸 Import Screenshot</button>
       <button onclick="openPasteImport()" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:white;">📋 Import Paste Text</button>
-      <button id="currencyToggle" onclick="toggleCurrency()" title="Toggle IDR/USD" style="padding:8px 12px;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:8px;cursor:pointer;font-weight:700;">IDR</button>
       <select id="langSelect" onchange="changeLang(this.value)" title="Ganti bahasa / Change language / Изменить язык / Cambiar idioma"
               style="padding:8px 12px; background:var(--panel); border:1px solid var(--border); color:var(--text); border-radius:8px; cursor:pointer; font-weight:600;">
         <optgroup label="Nusantara">
@@ -1611,12 +1609,7 @@ mydomain.net"></textarea>
       <button onclick="openActivity()" data-i18n="log">📜 Log</button>
       <button onclick="openFavorites()" data-i18n="fav">⭐ Fav</button>
       <button onclick="openNawalaDash()" class="btn-danger">🔴 Nawala</button>
-      <select id="tagFilter" onchange="filterByTag(this.value)" title="Filter by tag/niche" style="padding:8px 12px;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:8px;cursor:pointer;">
-        <option value="">🏷️ All Tags</option>
-      </select>
       <button id="expiryAlertBtn" onclick="showExpiringDomains()" style="display:none;background:#ef4444;color:white;font-weight:700;">⏰ <span id="expiryCount">0</span></button>
-      <button onclick="openTools()" data-i18n="tools">🔧 Tools</button>
-      <button onclick="openShortcuts()" data-i18n="keys">⌨️ Keys</button>
       <button class="btn-purple" id="adminBtn" onclick="openAdmin()" style="display:none;">Members</button>
       <button onclick="logout()">Logout</button>
     </div>
