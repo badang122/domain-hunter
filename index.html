@@ -1217,10 +1217,12 @@ example.com
 another.org
 mydomain.net"></textarea>
     <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+      <button onclick="pasteFromClipboard()" style="background:#6366f1;color:white;padding:8px 14px;border:0;border-radius:8px;cursor:pointer;font-weight:700;">📋 Baca Clipboard &amp; Auto-Import</button>
       <button class="btn-primary" onclick="pasteParseText()">🔍 Parse &amp; Preview</button>
       <button onclick="pasteParseAndImport()" style="background:linear-gradient(135deg,#10b981,#059669);color:white;padding:8px 14px;border:0;border-radius:8px;cursor:pointer;font-weight:700;">⚡ Parse &amp; Auto-Import SEMUA</button>
       <button class="btn-danger" onclick="document.getElementById('pasteText').value=''">Clear</button>
     </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:6px;">💡 <b>Baca Clipboard</b>: copy text di mana saja (Ctrl+C) → klik tombol → auto paste + auto import. Gak perlu paste manual.</div>
     <div id="pasteResult" style="margin-top:14px;"></div>
   </div>
 </div>
@@ -5471,6 +5473,21 @@ document.addEventListener('keydown', e => {
     toast('💾 Filter state tersimpan', 'success', 1800);
     return;
   }
+  // Ctrl+Shift+V — quick paste import (langsung dari clipboard, tanpa modal)
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'v') {
+    if (isTyping) return;
+    e.preventDefault();
+    (async () => {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (!text) { toast('Clipboard kosong', 'warn'); return; }
+        const rows = pasteParseRows(text);
+        if (rows.length === 0) { toast('Tidak ada domain valid di clipboard', 'warn'); return; }
+        pasteDoImport(rows);
+      } catch (e) { toast('Clipboard access denied', 'error'); }
+    })();
+    return;
+  }
 
   if (isTyping) return;
 
@@ -5750,6 +5767,36 @@ function pasteParseRows(text) {
     rows.push(row);
   }
   return rows;
+}
+
+// Read text dari clipboard + auto-import (tanpa perlu paste manual)
+async function pasteFromClipboard() {
+  try {
+    if (!navigator.clipboard || !navigator.clipboard.readText) {
+      toast('Browser tidak support Clipboard API. Paste manual (Ctrl+V)', 'warn', 4000);
+      return;
+    }
+    const text = await navigator.clipboard.readText();
+    if (!text || !text.trim()) {
+      toast('Clipboard kosong. Copy dulu text-nya (Ctrl+C)', 'warn', 3500);
+      return;
+    }
+    document.getElementById('pasteText').value = text;
+    const rows = pasteParseRows(text);
+    if (rows.length === 0) {
+      toast(`Clipboard ter-baca tapi tidak ada domain valid. Cek format.`, 'warn', 4000);
+      pasteParseText(); // show debug
+      return;
+    }
+    toast(`📋 ${rows.length} domain terbaca dari clipboard, importing...`, 'info', 2000);
+    pasteDoImport(rows);
+  } catch (e) {
+    if (e.name === 'NotAllowedError') {
+      toast('Browser block akses clipboard. Paste manual pakai Ctrl+V', 'warn', 4000);
+    } else {
+      toast('Gagal baca clipboard: ' + e.message, 'error', 4000);
+    }
+  }
 }
 
 function pasteParseText() {
