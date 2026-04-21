@@ -1209,6 +1209,10 @@
       <div style="font-size:11px;color:var(--muted);margin-top:6px;">Support PNG, JPG, WEBP. Max 10 MB.</div>
       <input type="file" id="ssFile" accept="image/*" style="display:none;" onchange="ssHandleFile(this.files[0])">
     </div>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+      <button onclick="event.stopPropagation();ssPasteFromClipboard();" style="background:#6366f1;color:white;padding:8px 14px;border:0;border-radius:8px;cursor:pointer;font-weight:700;">📋 Paste dari Clipboard</button>
+      <span style="color:var(--muted);font-size:12px;line-height:34px;">Copy gambar (Print Screen / Snipping Tool / copy dari browser) → klik tombol ini</span>
+    </div>
     <div id="ssPreview" style="margin-top:14px;display:none;">
       <img id="ssPreviewImg" style="max-width:100%;max-height:250px;border-radius:8px;border:1px solid var(--border);">
       <div style="margin-top:10px;display:flex;gap:8px;">
@@ -5668,6 +5672,36 @@ function ssReset() {
   document.getElementById('ssFile').value = '';
   document.getElementById('ssPreview').style.display = 'none';
   document.getElementById('ssResult').innerHTML = '';
+}
+
+// Paste image from clipboard via Clipboard API (modern browsers)
+async function ssPasteFromClipboard() {
+  try {
+    if (!navigator.clipboard || !navigator.clipboard.read) {
+      toast('Browser tidak support Clipboard API. Coba Ctrl+V langsung.', 'warn', 4000);
+      return;
+    }
+    const items = await navigator.clipboard.read();
+    for (const item of items) {
+      for (const type of item.types) {
+        if (type.startsWith('image/')) {
+          const blob = await item.getType(type);
+          // Convert blob to File
+          const file = new File([blob], `clipboard-${Date.now()}.${type.split('/')[1]}`, { type });
+          ssHandleFile(file);
+          toast('✅ Image dari clipboard berhasil di-load', 'success', 2500);
+          return;
+        }
+      }
+    }
+    toast('Tidak ada image di clipboard. Copy screenshot dulu (Print Screen / Snipping Tool).', 'warn', 4000);
+  } catch (e) {
+    if (e.name === 'NotAllowedError') {
+      toast('Browser block akses clipboard. Pakai Ctrl+V langsung di dalam modal.', 'warn', 4000);
+    } else {
+      toast('Gagal paste: ' + e.message, 'error', 4000);
+    }
+  }
 }
 
 function ssHandleFile(file) {
