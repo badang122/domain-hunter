@@ -1548,6 +1548,13 @@
         <input id="newSS" type="number" min="0" placeholder="0-100" style="width:85px;">
       </div>
       <div>
+        <label class="field-label"><span class="field-icon" style="background:#ec4899;">📅</span> Age (thn)</label>
+        <div style="display:flex;gap:4px;">
+          <input id="newAge" type="text" placeholder="0 / —" style="width:70px;" title="Tahun atau - (dash jika tidak tahu)">
+          <button type="button" onclick="document.getElementById('newAge').value='—'" title="Tidak tahu umur" style="padding:8px 10px;background:#374151;color:#fff;border:1px solid rgba(255,255,255,0.1);border-radius:8px;cursor:pointer;font-weight:700;">—</button>
+        </div>
+      </div>
+      <div>
         <label class="field-label"><span class="field-icon" style="background:#10b981;">DR</span> Dom Rating</label>
         <input id="newDR" type="number" min="0" placeholder="0-100" style="width:85px;">
       </div>
@@ -1556,19 +1563,12 @@
         <input id="newUR" type="number" min="0" placeholder="0-100" style="width:85px;">
       </div>
       <div>
-        <label class="field-label"><span class="field-icon" style="background:#06b6d4;">RD</span> Rating Domain</label>
-        <input id="newRD" type="text" placeholder="list/angka" style="width:120px;" title="Angka (450) atau list domain (gravatar.com, adobe.com...)">
-      </div>
-      <div>
         <label class="field-label"><span class="field-icon" style="background:#8b5cf6;">BL</span> Backlinks</label>
         <input id="newBL" type="text" placeholder="307K" style="width:100px;">
       </div>
       <div>
-        <label class="field-label"><span class="field-icon" style="background:#ec4899;">📅</span> Age (thn)</label>
-        <div style="display:flex;gap:4px;">
-          <input id="newAge" type="text" placeholder="0 / —" style="width:70px;" title="Tahun atau - (dash jika tidak tahu)">
-          <button type="button" onclick="document.getElementById('newAge').value='—'" title="Tidak tahu umur" style="padding:8px 10px;background:#374151;color:#fff;border:1px solid rgba(255,255,255,0.1);border-radius:8px;cursor:pointer;font-weight:700;">—</button>
-        </div>
+        <label class="field-label"><span class="field-icon" style="background:#06b6d4;">RD</span> Rating Domain</label>
+        <input id="newRD" type="text" placeholder="list/angka" style="width:120px;" title="Angka (450) atau list domain (gravatar.com, adobe.com...)">
       </div>
       <!-- RD Full list textarea — di samping Age (full-width, wrap ke baris baru) -->
       <div style="flex:1 1 100%;margin-top:4px;padding:10px;background:rgba(6,182,212,0.08);border:1px solid rgba(6,182,212,0.3);border-radius:10px;">
