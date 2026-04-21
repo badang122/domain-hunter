@@ -1476,6 +1476,32 @@ mydomain.net"></textarea>
 .expiry-warn { color:#fbbf24;font-size:11px;margin-left:4px; }
 </style>
 
+<!-- ═══ KANBAN BOARD MODAL ═══ -->
+<div class="modal-overlay" id="kanbanModal">
+  <div class="modal" style="width:95vw;max-width:1400px;max-height:92vh;overflow-y:auto;">
+    <h2>📋 Kanban Board — Domain Flipping Pipeline <button class="close" onclick="closeKanban()">×</button></h2>
+    <div id="kanbanBoard" style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:14px;min-height:400px;"></div>
+    <div style="margin-top:12px;color:var(--muted);font-size:12px;">💡 Drag &amp; drop domain antar kolom untuk update status.</div>
+  </div>
+</div>
+
+<!-- ═══ ROI DASHBOARD MODAL ═══ -->
+<div class="modal-overlay" id="roiModal">
+  <div class="modal" style="width:95vw;max-width:1000px;max-height:92vh;overflow-y:auto;">
+    <h2>💰 ROI &amp; Profit Dashboard <button class="close" onclick="closeROI()">×</button></h2>
+    <div id="roiStats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:14px;"></div>
+    <div id="roiDetail" style="margin-top:20px;"></div>
+  </div>
+</div>
+
+<!-- ═══ ANALYTICS MODAL ═══ -->
+<div class="modal-overlay" id="analyticsModal">
+  <div class="modal" style="width:95vw;max-width:1100px;max-height:92vh;overflow-y:auto;">
+    <h2>📊 Portfolio Analytics <button class="close" onclick="closeAnalytics()">×</button></h2>
+    <div id="analyticsGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-top:14px;"></div>
+  </div>
+</div>
+
 <!-- ═══ TOAST NOTIFICATION CONTAINER ═══ -->
 <div id="toastContainer" style="position:fixed;top:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:10px;pointer-events:none;"></div>
 
@@ -1618,6 +1644,9 @@ mydomain.net"></textarea>
       <button class="btn-primary" onclick="openAI()">🤖 AI</button>
       <button class="btn-success" onclick="openCharts()">📊 Charts</button>
       <button onclick="openLeaderboard()" style="background:linear-gradient(135deg,#fbbf24,#f97316);color:white;font-weight:700;">🏆 Leaderboard</button>
+      <button onclick="openKanban()" style="background:linear-gradient(135deg,#8b5cf6,#ec4899);color:white;font-weight:700;">📋 Kanban</button>
+      <button onclick="openROI()" style="background:linear-gradient(135deg,#10b981,#059669);color:white;font-weight:700;">💰 ROI</button>
+      <button onclick="openAnalytics()" style="background:linear-gradient(135deg,#06b6d4,#3b82f6);color:white;font-weight:700;">📊 Analytics</button>
       <div class="import-menu" style="position:relative;display:inline-block;">
         <button onclick="toggleImportMenu(event)" style="background:linear-gradient(135deg,#059669,#3b82f6);color:white;font-weight:700;padding:8px 14px;border:0;border-radius:8px;cursor:pointer;">📥 Import ▼</button>
         <div id="importMenuDropdown" style="display:none;position:absolute;top:100%;left:0;margin-top:4px;background:var(--panel);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.4);z-index:1000;min-width:220px;overflow:hidden;">
@@ -1628,6 +1657,8 @@ mydomain.net"></textarea>
       </div>
       <button onclick="openFavorites()" data-i18n="fav">⭐ Fav</button>
       <button onclick="openNawalaDash()" class="btn-danger">🔴 Nawala</button>
+      <button onclick="bulkAliveCheck()" style="background:linear-gradient(135deg,#0891b2,#0369a1);color:white;font-weight:700;">🟢 Alive Check</button>
+      <button onclick="bulkRDAPAge()" style="background:linear-gradient(135deg,#ec4899,#be185d);color:white;font-weight:700;">📅 Fetch Age</button>
       <button id="expiryAlertBtn" onclick="showExpiringDomains()" style="display:none;background:#ef4444;color:white;font-weight:700;">⏰ <span id="expiryCount">0</span></button>
       <button onclick="logout()">Logout</button>
     </div>
@@ -2053,7 +2084,8 @@ function render() {
           else if (days <= 30) expBadge = `<span class="expiry-soon" title="Expired dalam ${days} hari">⏰ ${days}d</span>`;
           else if (days <= 90) expBadge = `<span class="expiry-warn" title="Expired dalam ${days} hari">⏰ ${days}d</span>`;
         }
-        return `<td>${pin}<button class="fav-star ${isFav(d.domain)?'active':''}" onclick="toggleFav('${d.domain}')" title="Toggle favorite">${isFav(d.domain)?'⭐':'☆'}</button> <span class="domain" contenteditable="false">${d.domain}</span> ${tagChips}${expBadge}</td>`;
+        const aliveDot = meta.aliveStatus === 'alive' ? '<span style="color:#34d399;font-size:12px;margin-right:2px;" title="Alive (cek terakhir)">●</span>' : meta.aliveStatus === 'dead' ? '<span style="color:#ef4444;font-size:12px;margin-right:2px;" title="Dead">●</span>' : '';
+        return `<td>${pin}${aliveDot}<button class="fav-star ${isFav(d.domain)?'active':''}" onclick="toggleFav('${d.domain}')" title="Toggle favorite">${isFav(d.domain)?'⭐':'☆'}</button> <span class="domain" contenteditable="false" onmouseenter="showDomainHover(event,'${d.domain}')" onmouseleave="hideDomainHover()">${d.domain}</span> ${tagChips}${expBadge}</td>`;
       })(),
       score: `<td><span class="score ${scoreColor(score)}">${score}</span></td>`,
       status: `<td>${renderStatus(d)}</td>`,
@@ -2178,7 +2210,19 @@ function applyFilters() {
   const status = document.getElementById('statusFilter').value;
 
   filteredData = allData.filter(d => {
-    if (search && !d.domain.toLowerCase().includes(search)) return false;
+    if (search) {
+      // Super search: domain, rd (list), goodbl, notes, tags
+      const meta = JSON.parse(localStorage.getItem('dashboard_meta') || '{}')[d.domain] || {};
+      const haystack = [
+        d.domain,
+        d.rd || '',
+        d.goodbl || meta.goodbl || '',
+        d.notes || meta.notes || '',
+        meta.tags || '',
+        d.bl || ''
+      ].join(' ').toLowerCase();
+      if (!haystack.includes(search)) return false;
+    }
     if (d.da < daMin || d.pa < paMin || d.dr < drMin) return false;
     // Age: skip kalau "—" (tidak tahu) saat ada filter
     if (ageMin > 0) {
@@ -4437,7 +4481,7 @@ function renderLeaderboard() {
 // ═══ ESC to close modals ═══
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
-    ['aiModal','chartsModal','compareModal','activityModal','favoritesModal','shortcutsModal','toolsModal','leaderboardModal','propModal','bulkImportModal','trendModal'].forEach(id =>
+    ['aiModal','chartsModal','compareModal','activityModal','favoritesModal','shortcutsModal','toolsModal','leaderboardModal','propModal','bulkImportModal','trendModal','kanbanModal','roiModal','analyticsModal','screenshotModal','pasteImportModal'].forEach(id =>
       document.getElementById(id)?.classList.remove('active'));
     document.getElementById('globalSearch')?.classList.remove('active');
   }
@@ -6355,6 +6399,324 @@ function ssHandleFile(file) {
     document.getElementById('ssPreview').style.display = '';
   };
   reader.readAsDataURL(file);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 🎭 DOMAIN HOVER PREVIEW CARD
+// ═══════════════════════════════════════════════════════════════
+let _hoverTimeout = null;
+function showDomainHover(e, domain) {
+  if (_hoverTimeout) clearTimeout(_hoverTimeout);
+  _hoverTimeout = setTimeout(() => {
+    hideDomainHover();
+    const d = allData.find(x => x.domain === domain);
+    if (!d) return;
+    const meta = JSON.parse(localStorage.getItem('dashboard_meta') || '{}')[domain] || {};
+    const card = document.createElement('div');
+    card.id = 'domainHoverCard';
+    card.style.cssText = `position:fixed;z-index:100000;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px;min-width:260px;max-width:340px;box-shadow:0 10px 30px rgba(0,0,0,0.5);font-size:12px;pointer-events:none;`;
+    const rect = e.target.getBoundingClientRect();
+    card.style.left = Math.min(rect.left, window.innerWidth - 360) + 'px';
+    card.style.top = (rect.bottom + 6) + 'px';
+    const favicon = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+    const tags = (meta.tags || '').split(',').map(t=>t.trim()).filter(Boolean).slice(0,3);
+    card.innerHTML = `
+      <div style="display:flex;gap:10px;align-items:start;">
+        <img src="${favicon}" onerror="this.style.display='none'" style="width:32px;height:32px;border-radius:6px;background:#fff;padding:2px;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:700;color:#60a5fa;word-break:break-all;">${domain}</div>
+          <div style="color:var(--muted);font-size:10px;margin-top:2px;">Score ${calcScore(d)} · ${d.status || 'new'}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px;text-align:center;">
+        <div><div style="color:var(--muted);font-size:10px;">DA</div><b>${d.da||'-'}</b></div>
+        <div><div style="color:var(--muted);font-size:10px;">DR</div><b>${d.dr||'-'}</b></div>
+        <div><div style="color:var(--muted);font-size:10px;">Age</div><b>${d.age||'-'}y</b></div>
+        <div><div style="color:var(--muted);font-size:10px;">RD</div><b>${d.rd ? String(d.rd).split(',').length : '-'}</b></div>
+      </div>
+      ${tags.length ? `<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:3px;">${tags.map(t=>`<span class="tag-chip">${t}</span>`).join('')}</div>` : ''}
+      ${meta.dealStatus ? `<div style="margin-top:6px;font-size:10px;color:var(--muted);">Deal: ${meta.dealStatus}</div>` : ''}
+    `;
+    document.body.appendChild(card);
+  }, 350);
+}
+function hideDomainHover() {
+  if (_hoverTimeout) { clearTimeout(_hoverTimeout); _hoverTimeout = null; }
+  document.getElementById('domainHoverCard')?.remove();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 📋 KANBAN BOARD — domain flipping pipeline
+// ═══════════════════════════════════════════════════════════════
+const KANBAN_STAGES = [
+  { key: 'watching',    label: '👀 Watching',    color: '#60a5fa' },
+  { key: 'negotiating', label: '💬 Negotiating', color: '#fbbf24' },
+  { key: 'listed',      label: '🏷️ Listed',      color: '#a78bfa' },
+  { key: 'sold',        label: '✅ Sold',        color: '#34d399' },
+  { key: 'hold',        label: '🔒 Hold',        color: '#94a3b8' }
+];
+
+function openKanban() {
+  document.getElementById('kanbanModal').classList.add('active');
+  renderKanban();
+}
+function closeKanban() { document.getElementById('kanbanModal').classList.remove('active'); }
+
+function renderKanban() {
+  const board = document.getElementById('kanbanBoard');
+  const metaAll = JSON.parse(localStorage.getItem('dashboard_meta') || '{}');
+  const columns = {};
+  KANBAN_STAGES.forEach(s => columns[s.key] = []);
+  const unassigned = [];
+  allData.forEach(d => {
+    const m = metaAll[d.domain] || {};
+    const stage = m.dealStatus || '';
+    if (columns[stage]) columns[stage].push(d);
+    else unassigned.push(d);
+  });
+  // Only show unassigned kalau ada
+  const stages = [...KANBAN_STAGES];
+  board.innerHTML = stages.map(s => {
+    const domains = columns[s.key] || [];
+    return `
+      <div class="kb-col" data-stage="${s.key}" ondragover="event.preventDefault();this.style.background='rgba(99,102,241,0.1)';" ondragleave="this.style.background='';" ondrop="kbDrop(event,'${s.key}');this.style.background='';" style="background:var(--bg-soft);border-radius:12px;padding:10px;min-height:400px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid ${s.color};">
+          <b style="color:${s.color};">${s.label}</b>
+          <span style="background:${s.color};color:#1f2937;padding:1px 8px;border-radius:10px;font-size:11px;font-weight:700;">${domains.length}</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          ${domains.map(d => {
+            const m = metaAll[d.domain] || {};
+            const profit = m.targetPrice && m.buyPrice ? (parseInt(m.targetPrice) - parseInt(m.buyPrice)) : 0;
+            return `
+              <div class="kb-card" draggable="true" ondragstart="event.dataTransfer.setData('domain','${d.domain}');" onclick="openProp('${d.domain}');" style="background:var(--panel);padding:8px 10px;border-radius:8px;border:1px solid var(--border);cursor:move;font-size:12px;">
+                <div style="font-weight:700;color:#60a5fa;word-break:break-all;">${d.domain}</div>
+                <div style="color:var(--muted);font-size:10px;margin-top:3px;">DA ${d.da}/DR ${d.dr}/Age ${d.age}y</div>
+                ${profit ? `<div style="color:${profit>0?'#34d399':'#ef4444'};font-size:10px;font-weight:700;">${profit>0?'+':''}IDR ${formatID(profit)}</div>` : ''}
+              </div>`;
+          }).join('') || `<div style="color:var(--muted);font-size:11px;text-align:center;padding:20px;">Drag domain ke sini</div>`}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function kbDrop(e, stage) {
+  e.preventDefault();
+  const domain = e.dataTransfer.getData('domain');
+  if (!domain) return;
+  saveMeta(domain, { dealStatus: stage });
+  if (typeof logActivity === 'function') logActivity('KANBAN_MOVE', `${domain} → ${stage}`);
+  toast(`📋 ${domain} → ${stage}`, 'success', 2000);
+  renderKanban();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 💰 ROI DASHBOARD
+// ═══════════════════════════════════════════════════════════════
+function openROI() {
+  document.getElementById('roiModal').classList.add('active');
+  renderROI();
+}
+function closeROI() { document.getElementById('roiModal').classList.remove('active'); }
+
+function renderROI() {
+  const metaAll = JSON.parse(localStorage.getItem('dashboard_meta') || '{}');
+  let totalBuy = 0, totalTarget = 0, totalOffer = 0, totalSold = 0;
+  let countWith = 0, countSold = 0;
+  const domainDetails = [];
+  allData.forEach(d => {
+    const m = metaAll[d.domain] || {};
+    const buy = parseFloat(m.buyPrice) || 0;
+    const target = parseFloat(m.targetPrice) || 0;
+    const offer = parseFloat(m.currentOffer) || 0;
+    if (buy) { totalBuy += buy; countWith++; }
+    if (target) totalTarget += target;
+    if (offer) totalOffer += offer;
+    if (m.dealStatus === 'sold' && offer) { totalSold += (offer - buy); countSold++; }
+    if (buy || target) {
+      const roiPct = buy ? ((target - buy) / buy * 100).toFixed(1) : '—';
+      domainDetails.push({ domain: d.domain, buy, target, offer, status: m.dealStatus || '—', roi: roiPct });
+    }
+  });
+  const targetROI = totalBuy ? ((totalTarget - totalBuy) / totalBuy * 100).toFixed(1) : 0;
+  document.getElementById('roiStats').innerHTML = `
+    <div class="stat-card"><div class="stat-label">💵 Total Invested</div><div class="stat-value">IDR ${formatID(totalBuy)}</div></div>
+    <div class="stat-card"><div class="stat-label">🎯 Total Target</div><div class="stat-value good">IDR ${formatID(totalTarget)}</div></div>
+    <div class="stat-card"><div class="stat-label">📈 Target ROI</div><div class="stat-value ${targetROI >= 100 ? 'good' : 'mid'}">${targetROI}%</div></div>
+    <div class="stat-card"><div class="stat-label">✅ Realized Profit</div><div class="stat-value ${totalSold >= 0 ? 'good' : 'bad'}">IDR ${formatID(totalSold)}</div></div>
+    <div class="stat-card"><div class="stat-label">📦 Portfolio Count</div><div class="stat-value">${formatID(countWith)}</div></div>
+    <div class="stat-card"><div class="stat-label">🎉 Sold Count</div><div class="stat-value good">${formatID(countSold)}</div></div>
+  `;
+  domainDetails.sort((a,b) => (parseFloat(b.roi)||0) - (parseFloat(a.roi)||0));
+  document.getElementById('roiDetail').innerHTML = `
+    <h3 style="margin-bottom:10px;">💎 Portfolio Detail (sorted by ROI%)</h3>
+    <div style="max-height:400px;overflow-y:auto;background:var(--bg);border-radius:8px;padding:8px;">
+      <table style="width:100%;font-size:12px;">
+        <thead><tr><th>Domain</th><th>Buy</th><th>Target</th><th>Offer</th><th>ROI%</th><th>Status</th></tr></thead>
+        <tbody>${domainDetails.map(r => `<tr>
+          <td><b>${r.domain}</b></td>
+          <td>${r.buy ? formatID(r.buy) : '—'}</td>
+          <td>${r.target ? formatID(r.target) : '—'}</td>
+          <td>${r.offer ? formatID(r.offer) : '—'}</td>
+          <td style="color:${parseFloat(r.roi) >= 100 ? '#34d399' : '#fbbf24'};font-weight:700;">${r.roi}%</td>
+          <td><span class="tag">${r.status}</span></td>
+        </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px;">Belum ada data deal. Klik 🏠 di row untuk isi.</td></tr>'}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 📊 ANALYTICS DASHBOARD
+// ═══════════════════════════════════════════════════════════════
+function openAnalytics() {
+  document.getElementById('analyticsModal').classList.add('active');
+  renderAnalytics();
+}
+function closeAnalytics() { document.getElementById('analyticsModal').classList.remove('active'); }
+
+function renderAnalytics() {
+  const metaAll = JSON.parse(localStorage.getItem('dashboard_meta') || '{}');
+  // Niche distribution
+  const nicheCount = {};
+  allData.forEach(d => {
+    const tags = (metaAll[d.domain]?.tags || '').split(',').map(t=>t.trim()).filter(Boolean);
+    if (tags.length === 0) nicheCount['untagged'] = (nicheCount['untagged']||0) + 1;
+    tags.forEach(t => nicheCount[t] = (nicheCount[t]||0) + 1);
+  });
+  const nicheList = Object.entries(nicheCount).sort((a,b) => b[1] - a[1]).slice(0, 10);
+  // DA distribution
+  const daBuckets = { '0-20': 0, '20-40': 0, '40-60': 0, '60-80': 0, '80+': 0 };
+  allData.forEach(d => {
+    const da = d.da || 0;
+    if (da < 20) daBuckets['0-20']++;
+    else if (da < 40) daBuckets['20-40']++;
+    else if (da < 60) daBuckets['40-60']++;
+    else if (da < 80) daBuckets['60-80']++;
+    else daBuckets['80+']++;
+  });
+  // Age distribution
+  const ageBuckets = { '<1y': 0, '1-3y': 0, '3-5y': 0, '5-10y': 0, '10y+': 0 };
+  allData.forEach(d => {
+    const age = parseInt(d.age) || 0;
+    if (age < 1) ageBuckets['<1y']++;
+    else if (age <= 3) ageBuckets['1-3y']++;
+    else if (age <= 5) ageBuckets['3-5y']++;
+    else if (age <= 10) ageBuckets['5-10y']++;
+    else ageBuckets['10y+']++;
+  });
+  // Status distribution
+  const statusCount = {};
+  allData.forEach(d => { statusCount[d.status || 'new'] = (statusCount[d.status || 'new']||0) + 1; });
+
+  const renderBars = (obj, colors) => {
+    const max = Math.max(...Object.values(obj));
+    return Object.entries(obj).map(([k,v], i) => {
+      const pct = max ? (v / max * 100) : 0;
+      return `<div style="margin-bottom:6px;">
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px;">
+          <span>${k}</span><b>${v}</b>
+        </div>
+        <div style="background:var(--border);height:8px;border-radius:4px;overflow:hidden;">
+          <div style="background:${colors[i % colors.length]};height:100%;width:${pct}%;"></div>
+        </div>
+      </div>`;
+    }).join('');
+  };
+
+  document.getElementById('analyticsGrid').innerHTML = `
+    <div class="stat-card" style="text-align:left;padding:14px;"><b style="color:#f093fb;">🏷️ Top 10 Niches</b>
+      <div style="margin-top:10px;">${renderBars(Object.fromEntries(nicheList), ['#f093fb','#60a5fa','#34d399','#fbbf24','#ef4444','#a78bfa','#fb7185','#06b6d4','#f97316','#10b981'])}</div>
+    </div>
+    <div class="stat-card" style="text-align:left;padding:14px;"><b style="color:#34d399;">📊 DA Distribution</b>
+      <div style="margin-top:10px;">${renderBars(daBuckets, ['#ef4444','#f97316','#fbbf24','#34d399','#10b981'])}</div>
+    </div>
+    <div class="stat-card" style="text-align:left;padding:14px;"><b style="color:#fbbf24;">📅 Age Distribution</b>
+      <div style="margin-top:10px;">${renderBars(ageBuckets, ['#ef4444','#fbbf24','#60a5fa','#34d399','#a78bfa'])}</div>
+    </div>
+    <div class="stat-card" style="text-align:left;padding:14px;"><b style="color:#60a5fa;">📦 Status Distribution</b>
+      <div style="margin-top:10px;">${renderBars(statusCount, ['#60a5fa','#fbbf24','#ec4899','#34d399','#ef4444'])}</div>
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 🟢 BULK ALIVE CHECK — HTTP status per domain
+// ═══════════════════════════════════════════════════════════════
+async function bulkAliveCheck() {
+  if (allData.length === 0) { toast('Tidak ada domain', 'warn'); return; }
+  if (!confirm(`Cek alive status untuk ${allData.length} domain? (paralel 10, ~${Math.ceil(allData.length/10)*3}s)`)) return;
+  toast(`🟢 Alive check jalan untuk ${allData.length} domain...`, 'info', 3000);
+  const CONCURRENCY = 10;
+  const queue = [...allData];
+  let done = 0, alive = 0, dead = 0;
+  async function worker() {
+    while (queue.length > 0) {
+      const d = queue.shift();
+      if (!d) break;
+      try {
+        const img = new Image();
+        const result = await new Promise(resolve => {
+          const timer = setTimeout(() => { img.src = ''; resolve('unknown'); }, 5000);
+          img.onload = () => { clearTimeout(timer); resolve('alive'); };
+          img.onerror = () => { clearTimeout(timer); resolve('dead'); };
+          img.src = `https://${d.domain}/favicon.ico?_t=${Date.now()}`;
+        });
+        saveMeta(d.domain, { aliveStatus: result, aliveCheckedAt: new Date().toISOString() });
+        if (result === 'alive') alive++;
+        else if (result === 'dead') dead++;
+      } catch { dead++; }
+      done++;
+    }
+  }
+  await Promise.all(Array.from({length: CONCURRENCY}, worker));
+  toast(`✅ Alive check selesai: 🟢 ${alive} alive, 🔴 ${dead} dead, ⚠️ ${allData.length-alive-dead} unknown`, 'success', 6000);
+  if (typeof logActivity === 'function') logActivity('ALIVE_CHECK', `${alive} alive, ${dead} dead`);
+  applyFilters();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 📅 BULK RDAP — fetch domain age via RDAP (free, CORS-friendly)
+// ═══════════════════════════════════════════════════════════════
+async function fetchAgeRDAP(domain) {
+  try {
+    const res = await fetch(`https://rdap.org/domain/${encodeURIComponent(domain)}`, { headers: { 'Accept': 'application/rdap+json' } });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const events = data.events || [];
+    const reg = events.find(e => e.eventAction === 'registration');
+    if (!reg?.eventDate) return null;
+    const regDate = new Date(reg.eventDate);
+    const ageYears = Math.floor((Date.now() - regDate) / (365.25 * 86400000));
+    return ageYears;
+  } catch (e) { return null; }
+}
+
+async function bulkRDAPAge() {
+  const targets = allData.filter(d => !d.age || d.age === 0 || d.age === '—');
+  if (targets.length === 0) { toast('Semua domain sudah punya Age. Ketik manual di tabel untuk override.', 'info'); return; }
+  if (!confirm(`Fetch Age via RDAP untuk ${targets.length} domain? (~${Math.ceil(targets.length/5)*2}s)`)) return;
+  toast(`📅 RDAP fetch jalan untuk ${targets.length} domain...`, 'info', 3000);
+  const CONCURRENCY = 5;
+  const queue = [...targets];
+  let done = 0, filled = 0;
+  async function worker() {
+    while (queue.length > 0) {
+      const d = queue.shift();
+      if (!d) break;
+      const age = await fetchAgeRDAP(d.domain);
+      if (age !== null && age > 0) {
+        d.age = age;
+        saveMeta(d.domain, { age });
+        filled++;
+      }
+      done++;
+    }
+  }
+  await Promise.all(Array.from({length: CONCURRENCY}, worker));
+  toast(`✅ RDAP: ${filled}/${targets.length} age ter-fetch`, 'success', 5000);
+  if (typeof logActivity === 'function') logActivity('RDAP_AGE', `${filled} filled`);
+  applyFilters();
 }
 
 // Setup drag-drop + paste handlers (called once on init)
