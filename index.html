@@ -408,7 +408,45 @@
   .quick-link.nawala { border-left: 3px solid #dc2626; }
   .quick-link.moz { border-left: 3px solid #06b6d4; }
 
-  /* Check buttons */
+  /* Row action buttons — redesigned for cleaner look */
+  .row-actions {
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+    padding: 2px;
+    background: rgba(15,23,42,0.4);
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.05);
+  }
+  .row-btn {
+    width: 28px; height: 28px;
+    border: 0;
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: 14px;
+    display: inline-flex;
+    align-items: center; justify-content: center;
+    transition: all 0.15s ease;
+    background: rgba(255,255,255,0.06);
+    color: white;
+    padding: 0;
+  }
+  .row-btn:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(0,0,0,0.3); }
+  .row-btn:active { transform: translateY(0); }
+  .row-btn.ai    { background: linear-gradient(135deg, rgba(240,147,251,0.25), rgba(245,87,108,0.25)); }
+  .row-btn.ai:hover    { background: linear-gradient(135deg, #f093fb, #f5576c); }
+  .row-btn.edit  { background: rgba(99,102,241,0.25); }
+  .row-btn.edit:hover  { background: #6366f1; }
+  .row-btn.copy  { background: rgba(139,92,246,0.25); }
+  .row-btn.copy:hover  { background: #8b5cf6; }
+  .row-btn.prop  { background: rgba(52,211,153,0.25); }
+  .row-btn.prop:hover  { background: linear-gradient(135deg, #34d399, #fbbf24); }
+  .row-btn.del   { background: rgba(239,68,68,0.25); }
+  .row-btn.del:hover   { background: #ef4444; }
+  .row-btn.nuke  { background: rgba(127,29,29,0.35); }
+  .row-btn.nuke:hover  { background: #7f1d1d; }
+
+  /* Check buttons (legacy) */
   .check-link {
     display: inline-block;
     padding: 3px 8px;
@@ -553,7 +591,20 @@
     box-shadow: var(--shadow-lg);
     backdrop-filter: blur(12px);
     transition: all 0.3s;
-    min-width: 260px;
+    min-width: 220px;
+    max-width: 500px;
+    min-height: 100px;
+    resize: both;
+    overflow: auto;
+  }
+  .music-player.collapsed { resize: none; overflow: visible; }
+  .music-player .music-resize-hint {
+    position: absolute;
+    bottom: 2px; right: 2px;
+    color: var(--muted);
+    font-size: 10px;
+    opacity: 0.4;
+    pointer-events: none;
   }
   .music-player.collapsed {
     width: 52px;
@@ -1914,14 +1965,14 @@ function render() {
       age: `<td contenteditable="true" data-field="age" data-domain="${d.domain}">${(d.age === '—' || d.age === '-') ? '—' : (d.age || '—')}</td>`,
       nawala: `<td>${d.nawala === 'blocked' ? '<span class="bad">🔴 Blokir</span>' : d.nawala === 'safe' ? '<span class="good">🟢 Aman</span>' : '<span class="empty">—</span>'} <button class="check-link" style="background:#dc2626;color:white;padding:2px 6px;" onclick="autoCheckNawala('${d.domain}')" title="Cek Nawala otomatis">🔄</button></td>`,
       notes: `<td>${renderNotes(d)}</td>`,
-      check: `<td>
-        <button class="check-link" style="background:linear-gradient(135deg,#f093fb,#f5576c);color:white;" onclick="openDomainAI('${d.domain}')" title="AI Tools per domain">🤖</button>
-        <button class="check-link" style="background:#6366f1;color:white;" onclick="openEditDomain('${d.domain}')" title="Edit full">✏️</button>
-        <button class="check-link copy-btn" onclick="copyDomain('${d.domain}')" title="Copy domain">📋</button>
-        <button class="check-link delete-btn" onclick="deleteDomain('${d.domain}')" title="Delete (bisa di-restore)">🗑</button>
-        <button class="check-link" style="background:linear-gradient(135deg,#34d399,#fbbf24);color:white;" onclick="openProp('${d.domain}')" title="🏠 Property: Deal, Tags, Expiry, Pin">🏠</button>
-        <button class="check-link" style="background:#7f1d1d;color:white;" onclick="deleteDomainPermanent('${d.domain}')" title="Hapus Permanen (tidak bisa di-restore)">💀</button>
-      </td>`
+      check: `<td><div class="row-actions">
+        <button class="row-btn ai" onclick="openDomainAI('${d.domain}')" title="🤖 AI Tools">🤖</button>
+        <button class="row-btn edit" onclick="openEditDomain('${d.domain}')" title="✏️ Edit full">✏️</button>
+        <button class="row-btn copy" onclick="copyDomain('${d.domain}')" title="📋 Copy domain">📋</button>
+        <button class="row-btn prop" onclick="openProp('${d.domain}')" title="🏠 Property: Deal, Tags, Expiry">🏠</button>
+        <button class="row-btn del" onclick="deleteDomain('${d.domain}')" title="🗑 Delete (restorable)">🗑</button>
+        <button class="row-btn nuke" onclick="deleteDomainPermanent('${d.domain}')" title="💀 Hapus Permanen">💀</button>
+      </div></td>`
     };
     tr.innerHTML = visibleCols.map(c => cells[c] || '').join('');
     tbody.appendChild(tr);
@@ -4926,13 +4977,36 @@ function initMusicPlayer() {
   musicAudio.volume = musicState.vol;
   musicAudio.crossOrigin = 'anonymous';
 
-  // Restore saved position + enable drag
+  // Restore saved position + size + enable drag
   if (musicState.pos) {
     player.style.left = musicState.pos.x + 'px';
     player.style.top = musicState.pos.y + 'px';
     player.style.right = 'auto';
     player.style.bottom = 'auto';
   }
+  if (musicState.size && !musicState.collapsed) {
+    player.style.width = musicState.size.w + 'px';
+    player.style.height = musicState.size.h + 'px';
+  }
+  // Resize hint indicator
+  if (!player.querySelector('.music-resize-hint')) {
+    const hint = document.createElement('div');
+    hint.className = 'music-resize-hint';
+    hint.textContent = '⇲';
+    player.appendChild(hint);
+  }
+  // Save size saat resize (pakai ResizeObserver)
+  try {
+    const ro = new ResizeObserver(entries => {
+      for (const e of entries) {
+        if (!musicState.collapsed) {
+          musicState.size = { w: Math.round(e.contentRect.width), h: Math.round(e.contentRect.height) };
+          localStorage.setItem('dashboard_music', JSON.stringify(musicState));
+        }
+      }
+    });
+    ro.observe(player);
+  } catch (e) {}
   enableDragMusic(player);
 }
 
