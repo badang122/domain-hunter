@@ -4840,6 +4840,78 @@ function initMusicPlayer() {
   musicAudio = new Audio(MUSIC_STATIONS[musicState.station].url);
   musicAudio.volume = musicState.vol;
   musicAudio.crossOrigin = 'anonymous';
+
+  // Restore saved position + enable drag
+  if (musicState.pos) {
+    player.style.left = musicState.pos.x + 'px';
+    player.style.top = musicState.pos.y + 'px';
+    player.style.right = 'auto';
+    player.style.bottom = 'auto';
+  }
+  enableDragMusic(player);
+}
+
+function enableDragMusic(el) {
+  let dragging = false, sx = 0, sy = 0, ox = 0, oy = 0;
+  el.style.cursor = 'move';
+  el.addEventListener('mousedown', e => {
+    // Don't drag if clicking inside an interactive element (button, input, select, range)
+    const tag = e.target.tagName;
+    if (['BUTTON','INPUT','SELECT','OPTION','SPAN'].includes(tag) && e.target.id !== 'musicPlayer' && !e.target.classList.contains('music-title')) {
+      return;
+    }
+    dragging = true;
+    const r = el.getBoundingClientRect();
+    sx = e.clientX; sy = e.clientY;
+    ox = r.left; oy = r.top;
+    el.style.left = ox + 'px';
+    el.style.top = oy + 'px';
+    el.style.right = 'auto';
+    el.style.bottom = 'auto';
+    el.style.transition = 'none';
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    const newX = Math.max(0, Math.min(window.innerWidth - el.offsetWidth, ox + dx));
+    const newY = Math.max(0, Math.min(window.innerHeight - el.offsetHeight, oy + dy));
+    el.style.left = newX + 'px';
+    el.style.top = newY + 'px';
+  });
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    el.style.transition = '';
+    // Save position
+    musicState.pos = { x: parseInt(el.style.left), y: parseInt(el.style.top) };
+    localStorage.setItem('dashboard_music', JSON.stringify(musicState));
+  });
+  // Touch support for mobile
+  el.addEventListener('touchstart', e => {
+    const t = e.touches[0];
+    const tag = e.target.tagName;
+    if (['BUTTON','INPUT','SELECT'].includes(tag)) return;
+    dragging = true;
+    const r = el.getBoundingClientRect();
+    sx = t.clientX; sy = t.clientY;
+    ox = r.left; oy = r.top;
+    el.style.left = ox + 'px'; el.style.top = oy + 'px';
+    el.style.right = 'auto'; el.style.bottom = 'auto';
+  }, { passive: true });
+  document.addEventListener('touchmove', e => {
+    if (!dragging) return;
+    const t = e.touches[0];
+    const dx = t.clientX - sx, dy = t.clientY - sy;
+    el.style.left = Math.max(0, Math.min(window.innerWidth - el.offsetWidth, ox + dx)) + 'px';
+    el.style.top = Math.max(0, Math.min(window.innerHeight - el.offsetHeight, oy + dy)) + 'px';
+  }, { passive: true });
+  document.addEventListener('touchend', () => {
+    if (!dragging) return;
+    dragging = false;
+    musicState.pos = { x: parseInt(el.style.left), y: parseInt(el.style.top) };
+    localStorage.setItem('dashboard_music', JSON.stringify(musicState));
+  });
 }
 
 function toggleMusicPlayer() {
