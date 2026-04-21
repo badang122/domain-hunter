@@ -1718,18 +1718,18 @@ mydomain.net"></textarea>
   </div>
 
   <div class="panel">
-    <div style="margin-bottom:8px;font-size:12px;color:var(--muted);">🔍 FILTERS</div>
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:end;">
-      <div class="filter-group"><label class="filter-label">Search</label><input id="searchInput" type="text" placeholder="Search..."></div>
-      <div class="filter-group"><label class="filter-label">DA ≥</label><input id="daMin" type="number" min="0" placeholder="0"></div>
-      <div class="filter-group"><label class="filter-label">PA ≥</label><input id="paMin" type="number" min="0" placeholder="0"></div>
-      <div class="filter-group"><label class="filter-label">DR ≥</label><input id="drMin" type="number" min="0" placeholder="0"></div>
-      <div class="filter-group"><label class="filter-label">UR ≥</label><input id="urMin" type="number" min="0" placeholder="0"></div>
-      <div class="filter-group"><label class="filter-label">RD ≥</label><input id="rdMin" type="number" min="0" placeholder="0"></div>
-      <div class="filter-group"><label class="filter-label">Age ≥</label><input id="ageMin" type="number" min="0" placeholder="0"></div>
-      <div class="filter-group"><label class="filter-label">Score ≥</label><input id="scoreMin" type="number" min="0" placeholder="0"></div>
-      <div class="filter-group"><label class="filter-label">TLD</label><select id="tldFilter"><option value="">All</option><option>.com</option><option>.org</option><option>.net</option><option>.info</option><option>.biz</option></select></div>
-      <div class="filter-group"><label class="filter-label">Status</label><select id="statusFilter"><option value="">All</option><option>new</option><option>interest</option><option>buying</option><option>owned</option><option>reject</option></select></div>
+      <div class="filter-group" style="flex:1;min-width:260px;"><label class="filter-label">🔍 Search</label><input id="searchInput" type="text" placeholder="Search domain..." style="width:100%;"></div>
+      <!-- Hidden filters — still functional via code but not shown UI -->
+      <input id="daMin" type="hidden" value="">
+      <input id="paMin" type="hidden" value="">
+      <input id="drMin" type="hidden" value="">
+      <input id="urMin" type="hidden" value="">
+      <input id="rdMin" type="hidden" value="">
+      <input id="ageMin" type="hidden" value="">
+      <input id="scoreMin" type="hidden" value="">
+      <select id="tldFilter" style="display:none;"><option value=""></option></select>
+      <select id="statusFilter" style="display:none;"><option value=""></option></select>
       <button class="btn-danger" onclick="resetFilters()">Reset</button>
       <button class="btn-success" onclick="exportCSV()">Export CSV</button>
     </div>
