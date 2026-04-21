@@ -5723,6 +5723,7 @@ Untuk SETIAP domain yang terdeteksi, berikan data dalam format JSON array:
     "ss": 1,
     "bl": "5K",
     "rd": "120",
+    "refDomains": "gravatar.com, adobe.com, behance.net",
     "age": 5
   }
 ]
@@ -5730,9 +5731,10 @@ Untuk SETIAP domain yang terdeteksi, berikan data dalam format JSON array:
 Aturan:
 - domain HARUS lowercase, tanpa http://, tanpa www., tanpa trailing slash
 - da/pa/dr/ur/ss/age = integer (gunakan 0 kalau tidak terlihat)
-- bl/rd = string (boleh "5K", "12.3K", "1.2M", atau angka murni "1500")
+- bl/rd = string (boleh "5K", "12.3K", "1.2M", atau angka murni "1500" — jumlah backlink/referring)
+- **refDomains** = string berisi LIST nama domain referring yang ditampilkan (pisah koma), misal "gravatar.com, adobe.com, issuu.com". Kalau tidak ada list, kasih "".
 - Kalau Age dalam tahun terlihat (e.g. "5y", "5 years"), pakai angka (5)
-- Kalau ada kolom yang TIDAK terlihat di screenshot, set 0 atau ""
+- Kalau kolom TIDAK terlihat, set 0 atau "" (kosong)
 - HANYA kembalikan JSON array, tanpa text lain, tanpa markdown code block
 
 Mulai extract:`;
@@ -5784,21 +5786,27 @@ Mulai extract:`;
       return;
     }
     // Show preview table + import button
-    const rows = parsed.map(p => `
+    const rows = parsed.map(p => {
+      const ref = (p.refDomains || '').trim();
+      const refCell = ref ? (ref.length > 40 ? ref.slice(0,40) + '…' : ref) : '—';
+      return `
       <tr>
         <td><input type="checkbox" class="ss-row" data-d='${JSON.stringify(p).replace(/'/g,"&#39;")}' checked></td>
         <td>${p.domain || '—'}</td>
         <td>${p.da||0}</td><td>${p.pa||0}</td><td>${p.dr||0}</td>
         <td>${p.ur||0}</td><td>${p.ss||0}</td>
-        <td>${p.bl||'—'}</td><td>${p.rd||'—'}</td><td>${p.age||0}</td>
-      </tr>`).join('');
+        <td>${p.bl||'—'}</td><td>${p.rd||'—'}</td>
+        <td title="${ref.replace(/"/g,'&quot;')}" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${refCell}</td>
+        <td>${p.age||0}</td>
+      </tr>`;
+    }).join('');
     document.getElementById('ssResult').innerHTML = `
       <div style="background:rgba(16,185,129,0.1);padding:10px;border-radius:8px;margin-bottom:10px;">
         ✅ <b>${parsed.length} domain</b> terdeteksi. Centang yang mau di-import.
       </div>
       <div style="max-height:300px;overflow:auto;background:var(--bg);padding:8px;border-radius:6px;">
         <table style="width:100%;font-size:12px;">
-          <thead><tr><th><input type="checkbox" id="ssAll" checked onchange="document.querySelectorAll('.ss-row').forEach(c=>c.checked=this.checked)"></th><th>Domain</th><th>DA</th><th>PA</th><th>DR</th><th>UR</th><th>SS</th><th>BL</th><th>RD</th><th>Age</th></tr></thead>
+          <thead><tr><th><input type="checkbox" id="ssAll" checked onchange="document.querySelectorAll('.ss-row').forEach(c=>c.checked=this.checked)"></th><th>Domain</th><th>DA</th><th>PA</th><th>DR</th><th>UR</th><th>SS</th><th>BL</th><th>RD</th><th>Ref Domains (list)</th><th>Age</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>
@@ -5826,11 +5834,16 @@ function ssImport() {
       if (allData.find(x => x.domain === dom) || custom.find(x => x.domain === dom)) {
         skipped++; return;
       }
+      // Priority RD: kalau refDomains (list) ada, pakai itu sebagai rd (sesuai logic RD inline+textarea)
+      const refList = (p.refDomains || '').trim();
+      const rdCount = (p.rd || '').trim();
+      const rdValue = refList || rdCount; // list > count
       const entry = {
         domain: dom,
         da: parseInt(p.da)||0, pa: parseInt(p.pa)||0,
         dr: parseInt(p.dr)||0, ur: parseInt(p.ur)||0,
-        ss: parseInt(p.ss)||0, bl: p.bl||'', rd: p.rd||'',
+        ss: parseInt(p.ss)||0, bl: p.bl||'',
+        rd: rdValue,
         age: parseInt(p.age)||0,
         nawala: '', notes: '', status: 'new', custom: true
       };
