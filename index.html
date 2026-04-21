@@ -1827,8 +1827,44 @@ function scoreColor(s) {
   return 's-low';
 }
 
+// ═══════════════════════════════════════════════════════════════
+// ROBUST PERSISTENCE — mirror save + auto-recover dari backup
+// ═══════════════════════════════════════════════════════════════
+function loadCustomDomainsWithRecovery() {
+  let primary = [];
+  let backup = [];
+  try { primary = JSON.parse(localStorage.getItem('dashboard_custom_domains') || '[]'); } catch {}
+  try { backup = JSON.parse(localStorage.getItem('dashboard_custom_domains_backup') || '[]'); } catch {}
+  // Pilih yang paling besar (survivor)
+  if (primary.length >= backup.length) {
+    return primary;
+  } else {
+    console.warn('[Recovery] primary empty/smaller, using backup:', backup.length, 'vs primary:', primary.length);
+    // Restore primary dari backup
+    localStorage.setItem('dashboard_custom_domains', JSON.stringify(backup));
+    return backup;
+  }
+}
+// Wrap localStorage.setItem untuk dashboard_custom_domains (mirror ke backup)
+const _origSetItem = localStorage.setItem.bind(localStorage);
+localStorage.setItem = function(key, val) {
+  _origSetItem(key, val);
+  if (key === 'dashboard_custom_domains') {
+    try {
+      const data = JSON.parse(val);
+      if (Array.isArray(data) && data.length > 0) {
+        _origSetItem('dashboard_custom_domains_backup', val);
+        _origSetItem('dashboard_custom_domains_timestamp', Date.now().toString());
+      } else {
+        // Prevent empty save dari overwrite backup
+        console.warn('[Persist] Attempted empty save to custom_domains — skip backup');
+      }
+    } catch {}
+  }
+};
+
 let allData = parseCSV(rawData);
-const customDomains = JSON.parse(localStorage.getItem('dashboard_custom_domains') || '[]');
+const customDomains = loadCustomDomainsWithRecovery();
 const deletedDomains = JSON.parse(localStorage.getItem('dashboard_deleted_domains') || '[]');
 const blockedDomains = JSON.parse(localStorage.getItem('dashboard_blocked_domains') || '[]');
 const savedMeta = JSON.parse(localStorage.getItem('dashboard_meta') || '{}');
@@ -1836,10 +1872,10 @@ const savedMeta = JSON.parse(localStorage.getItem('dashboard_meta') || '{}');
 console.log('[Dashboard Init]', {
   rawCSV: allData.length,
   customDomains: customDomains.length,
+  customDomainsBackup: JSON.parse(localStorage.getItem('dashboard_custom_domains_backup') || '[]').length,
   deletedDomains: deletedDomains.length,
-  blockedDomains: blockedDomains.length,
   origin: location.origin,
-  localStorage_size: Object.keys(localStorage).length
+  lastSave: localStorage.getItem('dashboard_custom_domains_timestamp')
 });
 
 allData = [...customDomains, ...allData.filter(d => !customDomains.find(c => c.domain === d.domain))]
@@ -1854,9 +1890,8 @@ allData = [...customDomains, ...allData.filter(d => !customDomains.find(c => c.d
 
 console.log('[Dashboard Init] Final allData count:', allData.length);
 
-// SAFETY NET: kalau localStorage punya data tapi allData kosong = bug, auto-fix
 if (customDomains.length > 0 && allData.length === 0) {
-  console.warn('[Dashboard Init] ⚠️ Mismatch detected — re-hydrating from localStorage');
+  console.warn('[Init] ⚠️ Mismatch, force re-hydrate');
   allData = customDomains.filter(d => !deletedDomains.includes(d.domain) && !blockedDomains.includes(d.domain));
 }
 
