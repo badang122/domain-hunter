@@ -1829,10 +1829,18 @@ function scoreColor(s) {
 let allData = parseCSV(rawData);
 const customDomains = JSON.parse(localStorage.getItem('dashboard_custom_domains') || '[]');
 const deletedDomains = JSON.parse(localStorage.getItem('dashboard_deleted_domains') || '[]');
-const blockedDomains = JSON.parse(localStorage.getItem('dashboard_blocked_domains') || '[]');  // Permanent blocklist
-const savedMeta = JSON.parse(localStorage.getItem('dashboard_meta') || '{}'); // { domain: { status, notes } }
+const blockedDomains = JSON.parse(localStorage.getItem('dashboard_blocked_domains') || '[]');
+const savedMeta = JSON.parse(localStorage.getItem('dashboard_meta') || '{}');
 
-// Merge custom + CSV, apply metadata
+console.log('[Dashboard Init]', {
+  rawCSV: allData.length,
+  customDomains: customDomains.length,
+  deletedDomains: deletedDomains.length,
+  blockedDomains: blockedDomains.length,
+  origin: location.origin,
+  localStorage_size: Object.keys(localStorage).length
+});
+
 allData = [...customDomains, ...allData.filter(d => !customDomains.find(c => c.domain === d.domain))]
   .filter(d => !deletedDomains.includes(d.domain))
   .filter(d => !blockedDomains.includes(d.domain))
@@ -1842,6 +1850,8 @@ allData = [...customDomains, ...allData.filter(d => !customDomains.find(c => c.d
     notes: savedMeta[d.domain]?.notes || d.notes || '',
     nawala: savedMeta[d.domain]?.nawala || d.nawala || ''
   }));
+
+console.log('[Dashboard Init] Final allData count:', allData.length);
 
 let filteredData = [...allData];
 let sortKey = 'score';
