@@ -5758,9 +5758,16 @@ async function ssExtract(autoImport = false) {
   const base64 = ssCurrentImage.split(',')[1];
   const mimeType = ssCurrentImage.match(/data:([^;]+);/)?.[1] || 'image/png';
 
-  const prompt = `Analisis screenshot ini dan extract SEMUA domain dengan metric SEO-nya.
+  const prompt = `TUGAS: Baca screenshot ini seperti OCR profesional. Scan SETIAP baris tabel/list dari ATAS ke BAWAH.
 
-Untuk SETIAP domain yang terdeteksi, berikan data dalam format JSON array:
+⚠️ ATURAN KRITIKAL:
+- **Extract SEMUA** domain yang TERLIHAT di image (bisa 1, 5, 10, 50, 100, atau 500+ baris)
+- JANGAN berhenti setelah 2-3 baris — SCAN FULL image sampai paling bawah
+- Setiap domain punya metric berbeda — JANGAN COPY-PASTE nilai dari baris 1 ke baris lain
+- Kalau value tidak terlihat/tidak yakin → isi 0 atau "" (kosong)
+- Output HANYA JSON array valid, tanpa text penjelasan, tanpa markdown
+
+Format JSON array:
 [
   {
     "domain": "example.com",
@@ -5794,7 +5801,11 @@ Mulai extract:`;
           { text: prompt },
           { inline_data: { mime_type: mimeType, data: base64 } }
         ]
-      }]
+      }],
+      generationConfig: {
+        maxOutputTokens: 8192,  // max tokens untuk list panjang
+        temperature: 0.1        // lebih deterministic
+      }
     });
     // Try beberapa model — fallback kalau yang pertama overload
     const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
@@ -5856,11 +5867,12 @@ Mulai extract:`;
       }
     }
     if (!Array.isArray(parsed) || parsed.length === 0) {
-      document.getElementById('ssResult').innerHTML = `<div style="color:#fbbf24;">⚠️ Tidak ada domain terdeteksi dalam screenshot.</div>`;
+      document.getElementById('ssResult').innerHTML = `<div style="color:#fbbf24;">⚠️ Tidak ada domain terdeteksi dalam screenshot.<br><small style="color:var(--muted);">Raw response: ${text.slice(0,300).replace(/</g,'&lt;')}...</small></div>`;
       btn.disabled = false;
       btn.innerHTML = '🤖 Extract (preview)';
       return;
     }
+    console.log('[Gemini Vision] Detected', parsed.length, 'domains. Raw response length:', text.length);
 
     // Auto-import mode: langsung import semua tanpa preview
     if (autoImport) {
