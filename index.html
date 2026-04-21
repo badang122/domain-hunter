@@ -1215,8 +1215,9 @@
     </div>
     <div id="ssPreview" style="margin-top:14px;display:none;">
       <img id="ssPreviewImg" style="max-width:100%;max-height:250px;border-radius:8px;border:1px solid var(--border);">
-      <div style="margin-top:10px;display:flex;gap:8px;">
-        <button class="btn-primary" onclick="ssExtract()" id="ssExtractBtn">🤖 Extract via Gemini AI</button>
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn-primary" onclick="ssExtract(false)" id="ssExtractBtn">🤖 Extract (preview)</button>
+        <button onclick="ssExtract(true)" id="ssExtractAutoBtn" style="background:linear-gradient(135deg,#10b981,#059669);color:white;padding:8px 14px;border:0;border-radius:8px;cursor:pointer;font-weight:700;">⚡ Extract &amp; Auto-Import SEMUA</button>
         <button class="btn-danger" onclick="ssReset()">Reset</button>
       </div>
     </div>
@@ -5744,7 +5745,7 @@ function ssSetupHandlers() {
 }
 setTimeout(ssSetupHandlers, 1000);
 
-async function ssExtract() {
+async function ssExtract(autoImport = false) {
   if (!ssCurrentImage) { toast('Upload gambar dulu', 'warn'); return; }
   const userKey = localStorage.getItem('dashboard_gemini_key') || DEFAULT_API_KEYS.gemini;
   // Kalau user kosong, pakai backend proxy /api/gemini (key di CF env var)
@@ -5829,7 +5830,38 @@ Mulai extract:`;
     if (!Array.isArray(parsed) || parsed.length === 0) {
       document.getElementById('ssResult').innerHTML = `<div style="color:#fbbf24;">⚠️ Tidak ada domain terdeteksi dalam screenshot.</div>`;
       btn.disabled = false;
-      btn.innerHTML = '🤖 Extract via Gemini AI';
+      btn.innerHTML = '🤖 Extract (preview)';
+      return;
+    }
+
+    // Auto-import mode: langsung import semua tanpa preview
+    if (autoImport) {
+      const custom = JSON.parse(localStorage.getItem('dashboard_custom_domains') || '[]');
+      let added = 0, skipped = 0;
+      parsed.forEach(p => {
+        if (!p.domain || !p.domain.includes('.')) return;
+        const dom = p.domain.toLowerCase().trim();
+        if (allData.find(x => x.domain === dom) || custom.find(x => x.domain === dom)) {
+          skipped++; return;
+        }
+        const refList = (p.refDomains || '').trim();
+        const rdCount = (p.rd || '').trim();
+        const entry = {
+          domain: dom,
+          da: parseInt(p.da)||0, pa: parseInt(p.pa)||0,
+          dr: parseInt(p.dr)||0, ur: parseInt(p.ur)||0,
+          ss: parseInt(p.ss)||0, bl: p.bl||'',
+          rd: refList || rdCount,
+          age: parseInt(p.age)||0,
+          nawala: '', notes: '', status: 'new', custom: true
+        };
+        custom.push(entry); allData.push(entry); added++;
+      });
+      localStorage.setItem('dashboard_custom_domains', JSON.stringify(custom));
+      if (typeof logActivity === 'function') logActivity('SCREENSHOT_AUTO_IMPORT', `${added} added, ${skipped} skipped`);
+      closeScreenshot();
+      applyFilters();
+      toast(`⚡ Auto-import selesai: ${added} domain baru + ${skipped} sudah ada`, 'success', 6000);
       return;
     }
     // Show preview table + import button
@@ -5864,7 +5896,7 @@ Mulai extract:`;
   } catch (e) {
     document.getElementById('ssResult').innerHTML = `<div style="color:#ef4444;">❌ Network error: ${e.message}</div>`;
     btn.disabled = false;
-    btn.innerHTML = '🤖 Extract via Gemini AI';
+    btn.innerHTML = '🤖 Extract (preview)';
   }
 }
 
