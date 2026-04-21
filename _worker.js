@@ -91,6 +91,35 @@ export default {
       return jsonResp({ domain, ...result });
     }
 
+    // Gemini AI proxy — key disimpan server-side di env.GEMINI_KEY
+    // Body: { model?: 'gemini-2.5-flash', contents: [...] }
+    if (url.pathname === '/api/gemini' && request.method === 'POST') {
+      const apiKey = env.GEMINI_KEY;
+      if (!apiKey) return jsonResp({ error: 'GEMINI_KEY not configured in CF Pages env vars' }, 500);
+      try {
+        const body = await request.json();
+        const model = body.model || 'gemini-2.5-flash';
+        const upstream = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        // Strip 'model' field from body before forwarding (Gemini API doesn't expect it)
+        const { model: _m, ...payload } = body;
+        const res = await fetch(upstream, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        return new Response(JSON.stringify(data), {
+          status: res.status,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*'
+          }
+        });
+      } catch (e) {
+        return jsonResp({ error: String(e) }, 500);
+      }
+    }
+
     if (url.pathname === '/api/check-nawala-bulk' && request.method === 'POST') {
       try {
         const body = await request.json();

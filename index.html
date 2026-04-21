@@ -3891,16 +3891,25 @@ async function callGemini(prompt) {
   if (provider === 'groq') return await callGroq(prompt);
   if (provider === 'openrouter') return await callOpenRouter(prompt);
 
-  const key = localStorage.getItem('dashboard_gemini_key') || DEFAULT_API_KEYS.gemini;
-  if (!key) { alert('Simpan API key Gemini dulu'); return null; }
+  const userKey = localStorage.getItem('dashboard_gemini_key') || DEFAULT_API_KEYS.gemini;
   const data = getAllDomainsForAI();
   const ctx = `Data domain (${data.length} total):\n${JSON.stringify(data)}\n\nJawab dalam bahasa Indonesia singkat dan praktis.\n\nPERTANYAAN: ${prompt}`;
   try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ contents: [{ parts: [{ text: ctx }] }] })
-    });
-    const j = await res.json();
+    let res, j;
+    if (userKey) {
+      // Pakai key user (langsung ke Gemini)
+      res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${userKey}`, {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ contents: [{ parts: [{ text: ctx }] }] })
+      });
+    } else {
+      // Fallback: pakai backend proxy (key disimpan di CF Pages env var)
+      res = await fetch('/api/gemini', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ contents: [{ parts: [{ text: ctx }] }] })
+      });
+    }
+    j = await res.json();
     if (j.error) return '❌ ' + j.error.message;
     return j.candidates?.[0]?.content?.parts?.[0]?.text || '(no response)';
   } catch (e) { return '❌ ' + e.message; }
@@ -5690,11 +5699,8 @@ setTimeout(ssSetupHandlers, 1000);
 
 async function ssExtract() {
   if (!ssCurrentImage) { toast('Upload gambar dulu', 'warn'); return; }
-  const key = localStorage.getItem('dashboard_gemini_key') || DEFAULT_API_KEYS.gemini;
-  if (!key) {
-    toast('Gemini API key kosong. Set di 🤖 AI -> Settings.', 'error', 5000);
-    return;
-  }
+  const userKey = localStorage.getItem('dashboard_gemini_key') || DEFAULT_API_KEYS.gemini;
+  // Kalau user kosong, pakai backend proxy /api/gemini (key di CF env var)
   const btn = document.getElementById('ssExtractBtn');
   btn.disabled = true;
   btn.innerHTML = '⏳ Extracting...';
@@ -5732,18 +5738,19 @@ Aturan:
 Mulai extract:`;
 
   try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: prompt },
-            { inline_data: { mime_type: mimeType, data: base64 } }
-          ]
-        }]
-      })
+    const reqBody = JSON.stringify({
+      contents: [{
+        parts: [
+          { text: prompt },
+          { inline_data: { mime_type: mimeType, data: base64 } }
+        ]
+      }]
     });
+    const res = userKey
+      ? await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${userKey}`, {
+          method: 'POST', headers: {'Content-Type': 'application/json'}, body: reqBody })
+      : await fetch('/api/gemini', {
+          method: 'POST', headers: {'Content-Type': 'application/json'}, body: reqBody });
     const j = await res.json();
     if (j.error) {
       document.getElementById('ssResult').innerHTML = `<div style="color:#ef4444;">❌ Gemini error: ${j.error.message}</div>`;
