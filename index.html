@@ -1841,24 +1841,34 @@ function render() {
       bl: `<td contenteditable="true" data-field="bl" data-domain="${d.domain}">${formatBL(d.bl)}</td>`,
       rd: (() => {
         const rdVal = d.rd || '';
-        const hasComma = rdVal.includes(',') && !/^\d[\d,.]*$/.test(rdVal); // ada koma tapi bukan angka
+        const hasComma = rdVal.includes(',') && !/^\d[\d,.]*$/.test(rdVal);
+        // Hitung nilai RD (jumlah unik domain kalau list, atau angka kalau numeric)
+        let rdCount = 0;
+        if (hasComma) {
+          rdCount = rdVal.split(',').map(s => s.trim()).filter(Boolean).length;
+        } else if (/^\d+$/.test(rdVal.trim())) {
+          rdCount = parseInt(rdVal) || 0;
+        } else if (rdVal) {
+          // Coba parse dari text (misal "5K" → 5000)
+          rdCount = parseBL(rdVal);
+        }
+        // Color by value: RD ≥100 = good, ≥30 = mid, else bad
+        const colorClass = rdCount >= 100 ? 'good' : rdCount >= 30 ? 'mid' : rdCount > 0 ? 'bad' : 'empty';
+
         let display;
         if (!rdVal) {
           display = `<span style="color:var(--muted);">📝 Edit</span>`;
         } else if (hasComma) {
-          // List domain
           const items = rdVal.split(',').map(s => s.trim()).filter(Boolean);
           const preview = items.slice(0, 2).join(', ');
-          const extra = items.length > 2 ? ` <span style="color:#60a5fa;font-size:11px;">(${items.length})</span>` : '';
-          display = preview + extra;
+          const extra = items.length > 2 ? ` <b style="color:#60a5fa;font-size:11px;">(${items.length})</b>` : '';
+          display = `<b>${formatID(items.length)}</b> · ${preview}${extra}`;
         } else if (/^\d+$/.test(rdVal.trim())) {
-          // Angka murni → format dengan titik
-          display = formatID(rdVal);
+          display = `<b>${formatID(rdVal)}</b>`;
         } else {
-          // Text biasa
           display = rdVal.length > 30 ? rdVal.slice(0, 30) + '…' : rdVal;
         }
-        return `<td data-field="rd" data-domain="${d.domain}" title="${rdVal.replace(/"/g,'&quot;')}" style="max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer;" onclick="editRD('${d.domain}')">${display}</td>`;
+        return `<td class="${colorClass}" data-field="rd" data-domain="${d.domain}" title="${rdVal.replace(/"/g,'&quot;')} (nilai: ${formatID(rdCount)})" style="max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer;" onclick="editRD('${d.domain}')">${display}</td>`;
       })(),
       age: `<td contenteditable="true" data-field="age" data-domain="${d.domain}">${(d.age === '—' || d.age === '-') ? '—' : (d.age || '—')}</td>`,
       nawala: `<td>${d.nawala === 'blocked' ? '<span class="bad">🔴 Blokir</span>' : d.nawala === 'safe' ? '<span class="good">🟢 Aman</span>' : '<span class="empty">—</span>'} <button class="check-link" style="background:#dc2626;color:white;padding:2px 6px;" onclick="autoCheckNawala('${d.domain}')" title="Cek Nawala otomatis">🔄</button></td>`,
