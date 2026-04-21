@@ -785,10 +785,36 @@
 
 <!-- Settings Modal -->
 <div class="modal-overlay" id="settingsModal">
-  <div class="modal">
+  <div class="modal" style="max-height:90vh;overflow-y:auto;">
     <h2>⚙️ Settings <button class="close" onclick="closeSettings()">×</button></h2>
 
-    <h3 style="margin:16px 0 8px;">Show/Hide Columns</h3>
+    <h3 style="margin:16px 0 8px;">🌐 Bahasa / Language</h3>
+    <select id="langSelectInSettings" onchange="changeLang(this.value)" style="padding:8px 12px; background:var(--panel); border:1px solid var(--border); color:var(--text); border-radius:8px; cursor:pointer; font-weight:600; width:100%;">
+      <optgroup label="Nusantara">
+        <option value="id">🇮🇩 Indonesia</option>
+        <option value="ms">🇲🇾 Melayu</option>
+        <option value="jv">🏝️ Jawa</option>
+        <option value="su">🌾 Sunda</option>
+      </optgroup>
+      <optgroup label="International">
+        <option value="en">🇬🇧 English</option>
+        <option value="es">🇪🇸 Español</option>
+        <option value="es-AR">🇦🇷 Argentino</option>
+        <option value="pt">🇵🇹 Português</option>
+        <option value="pt-BR">🇧🇷 Brasileiro</option>
+        <option value="ru">🇷🇺 Русский</option>
+        <option value="ar">🇸🇦 العربية</option>
+        <option value="th">🇹🇭 ไทย</option>
+      </optgroup>
+    </select>
+
+    <h3 style="margin:20px 0 8px;">📜 Aktivitas &amp; 👥 Anggota</h3>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button onclick="openActivity()">📜 Activity Log</button>
+      <button id="adminBtnSettings" class="btn-purple" onclick="openAdmin()" style="display:none;">👥 Members</button>
+    </div>
+
+    <h3 style="margin:20px 0 8px;">Show/Hide Columns</h3>
     <div id="colToggles"></div>
 
     <h3 style="margin:20px 0 8px;">Theme</h3>
@@ -1584,33 +1610,17 @@ mydomain.net"></textarea>
       <button class="btn-primary" onclick="openAI()">🤖 AI</button>
       <button class="btn-success" onclick="openCharts()">📊 Charts</button>
       <button onclick="openLeaderboard()" style="background:linear-gradient(135deg,#fbbf24,#f97316);color:white;font-weight:700;">🏆 Leaderboard</button>
-      <button onclick="openBulkImport()" style="background:linear-gradient(135deg,#059669,#047857);color:white;">📥 Import Excel</button>
-      <button onclick="openScreenshot()" style="background:linear-gradient(135deg,#3b82f6,#1e40af);color:white;">📸 Import Screenshot</button>
-      <button onclick="openPasteImport()" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:white;">📋 Import Paste Text</button>
-      <select id="langSelect" onchange="changeLang(this.value)" title="Ganti bahasa / Change language / Изменить язык / Cambiar idioma"
-              style="padding:8px 12px; background:var(--panel); border:1px solid var(--border); color:var(--text); border-radius:8px; cursor:pointer; font-weight:600;">
-        <optgroup label="Nusantara">
-          <option value="id">🇮🇩 Indonesia</option>
-          <option value="ms">🇲🇾 Melayu</option>
-          <option value="jv">🏝️ Jawa</option>
-          <option value="su">🌾 Sunda</option>
-        </optgroup>
-        <optgroup label="International">
-          <option value="en">🇬🇧 English</option>
-          <option value="es">🇪🇸 Español</option>
-          <option value="es-AR">🇦🇷 Argentino</option>
-          <option value="pt">🇵🇹 Português</option>
-          <option value="pt-BR">🇧🇷 Brasileiro</option>
-          <option value="ru">🇷🇺 Русский</option>
-          <option value="ar">🇸🇦 العربية</option>
-          <option value="th">🇹🇭 ไทย</option>
-        </optgroup>
-      </select>
-      <button onclick="openActivity()" data-i18n="log">📜 Log</button>
+      <div class="import-menu" style="position:relative;display:inline-block;">
+        <button onclick="toggleImportMenu(event)" style="background:linear-gradient(135deg,#059669,#3b82f6);color:white;font-weight:700;padding:8px 14px;border:0;border-radius:8px;cursor:pointer;">📥 Import ▼</button>
+        <div id="importMenuDropdown" style="display:none;position:absolute;top:100%;left:0;margin-top:4px;background:var(--panel);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.4);z-index:1000;min-width:220px;overflow:hidden;">
+          <button onclick="openBulkImport();closeImportMenu();" style="display:block;width:100%;text-align:left;padding:10px 14px;background:transparent;color:var(--text);border:0;cursor:pointer;border-bottom:1px solid var(--border);">📥 Excel / CSV</button>
+          <button onclick="openScreenshot();closeImportMenu();" style="display:block;width:100%;text-align:left;padding:10px 14px;background:transparent;color:var(--text);border:0;cursor:pointer;border-bottom:1px solid var(--border);">📸 Screenshot (Gemini AI)</button>
+          <button onclick="openPasteImport();closeImportMenu();" style="display:block;width:100%;text-align:left;padding:10px 14px;background:transparent;color:var(--text);border:0;cursor:pointer;">📋 Paste Text</button>
+        </div>
+      </div>
       <button onclick="openFavorites()" data-i18n="fav">⭐ Fav</button>
       <button onclick="openNawalaDash()" class="btn-danger">🔴 Nawala</button>
       <button id="expiryAlertBtn" onclick="showExpiringDomains()" style="display:none;background:#ef4444;color:white;font-weight:700;">⏰ <span id="expiryCount">0</span></button>
-      <button class="btn-purple" id="adminBtn" onclick="openAdmin()" style="display:none;">Members</button>
       <button onclick="logout()">Logout</button>
     </div>
   </div>
@@ -3315,7 +3325,8 @@ function showDashboard(user) {
   // Role-based UI restrictions
   const isAdmin = user.role === 'admin';
   if (isAdmin) {
-    document.getElementById('adminBtn').style.display = 'inline-block';
+    const ab = document.getElementById('adminBtn'); if (ab) ab.style.display = 'inline-block';
+    const abs = document.getElementById('adminBtnSettings'); if (abs) abs.style.display = 'inline-block';
     document.body.classList.remove('role-user');
   } else {
     // User role: hide destructive actions
@@ -4985,6 +4996,8 @@ function applyLanguage() {
   document.documentElement.lang = currentLang;
   const sel = document.getElementById('langSelect');
   if (sel) sel.value = currentLang;
+  const sel2 = document.getElementById('langSelectInSettings');
+  if (sel2) sel2.value = currentLang;
 }
 
 function changeLang(lang) {
@@ -5823,6 +5836,21 @@ function loadXLSX(cb) {
   s.onload = () => { xlsxLoaded = true; cb(); };
   document.head.appendChild(s);
 }
+
+// Import menu dropdown toggle
+function toggleImportMenu(e) {
+  e?.stopPropagation();
+  const dd = document.getElementById('importMenuDropdown');
+  if (!dd) return;
+  dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+}
+function closeImportMenu() {
+  const dd = document.getElementById('importMenuDropdown');
+  if (dd) dd.style.display = 'none';
+}
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.import-menu')) closeImportMenu();
+});
 
 function openBulkImport() {
   loadXLSX(() => {
