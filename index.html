@@ -1195,6 +1195,31 @@
   </div>
 </div>
 
+<!-- ═══ SCREENSHOT IMPORT MODAL — extract via Gemini Vision ═══ -->
+<div class="modal-overlay" id="screenshotModal">
+  <div class="modal" style="width:780px;max-width:96vw;max-height:90vh;overflow-y:auto;">
+    <h2>📸 Import dari Screenshot (AI Vision) <button class="close" onclick="closeScreenshot()">×</button></h2>
+    <div style="background:rgba(59,130,246,0.1);padding:10px;border-radius:8px;border:1px solid rgba(59,130,246,0.3);margin-bottom:14px;font-size:13px;">
+      💡 Drag-drop / paste / pilih screenshot dari DA-PA Checker, Ahrefs, Moz, atau tabel domain manapun. AI Gemini akan extract: domain, DA, PA, DR, UR, SS, BL, Age otomatis.
+    </div>
+    <div id="ssDropZone" onclick="document.getElementById('ssFile').click()"
+         style="border:2px dashed var(--border);border-radius:12px;padding:30px;text-align:center;cursor:pointer;background:var(--bg-soft);transition:all 0.2s;">
+      <div style="font-size:48px;margin-bottom:8px;">🖼️</div>
+      <div style="font-weight:700;color:#60a5fa;">Drop image here, klik, atau Ctrl+V paste</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px;">Support PNG, JPG, WEBP. Max 10 MB.</div>
+      <input type="file" id="ssFile" accept="image/*" style="display:none;" onchange="ssHandleFile(this.files[0])">
+    </div>
+    <div id="ssPreview" style="margin-top:14px;display:none;">
+      <img id="ssPreviewImg" style="max-width:100%;max-height:250px;border-radius:8px;border:1px solid var(--border);">
+      <div style="margin-top:10px;display:flex;gap:8px;">
+        <button class="btn-primary" onclick="ssExtract()" id="ssExtractBtn">🤖 Extract via Gemini AI</button>
+        <button class="btn-danger" onclick="ssReset()">Reset</button>
+      </div>
+    </div>
+    <div id="ssResult" style="margin-top:14px;"></div>
+  </div>
+</div>
+
 <!-- ═══ BULK IMPORT MODAL — Excel/CSV ═══ -->
 <div class="modal-overlay" id="bulkImportModal">
   <div class="modal" style="width:720px;max-width:95vw;max-height:88vh;overflow-y:auto;">
@@ -1451,6 +1476,7 @@
       <button class="btn-warn" onclick="openCompare()">⚖️ Compare</button>
       <button onclick="openLeaderboard()" style="background:linear-gradient(135deg,#fbbf24,#f97316);color:white;font-weight:700;">🏆 Leaderboard</button>
       <button onclick="openBulkImport()" style="background:linear-gradient(135deg,#059669,#047857);color:white;">📥 Import Excel</button>
+      <button onclick="openScreenshot()" style="background:linear-gradient(135deg,#3b82f6,#1e40af);color:white;">📸 Import Screenshot</button>
       <button id="currencyToggle" onclick="toggleCurrency()" title="Toggle IDR/USD" style="padding:8px 12px;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:8px;cursor:pointer;font-weight:700;">IDR</button>
       <select id="langSelect" onchange="changeLang(this.value)" title="Ganti bahasa / Change language / Изменить язык / Cambiar idioma"
               style="padding:8px 12px; background:var(--panel); border:1px solid var(--border); color:var(--text); border-radius:8px; cursor:pointer; font-weight:600;">
@@ -5602,6 +5628,213 @@ async function parseBulkImport(file) {
     }
   };
   reader.readAsArrayBuffer(file);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 📸 SCREENSHOT IMPORT — extract domain data via Gemini Vision
+// ═══════════════════════════════════════════════════════════════
+let ssCurrentImage = null; // base64 data URL
+
+function openScreenshot() {
+  document.getElementById('screenshotModal').classList.add('active');
+  ssReset();
+}
+function closeScreenshot() { document.getElementById('screenshotModal').classList.remove('active'); }
+
+function ssReset() {
+  ssCurrentImage = null;
+  document.getElementById('ssFile').value = '';
+  document.getElementById('ssPreview').style.display = 'none';
+  document.getElementById('ssResult').innerHTML = '';
+}
+
+function ssHandleFile(file) {
+  if (!file) return;
+  if (!file.type.startsWith('image/')) { toast('Bukan file gambar', 'error'); return; }
+  if (file.size > 10 * 1024 * 1024) { toast('File > 10MB', 'error'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    ssCurrentImage = e.target.result;
+    document.getElementById('ssPreviewImg').src = ssCurrentImage;
+    document.getElementById('ssPreview').style.display = '';
+  };
+  reader.readAsDataURL(file);
+}
+
+// Setup drag-drop + paste handlers (called once on init)
+function ssSetupHandlers() {
+  const zone = document.getElementById('ssDropZone');
+  if (!zone) return;
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.style.borderColor = '#60a5fa'; });
+  zone.addEventListener('dragleave', e => { zone.style.borderColor = ''; });
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.style.borderColor = '';
+    const f = e.dataTransfer.files[0];
+    if (f) ssHandleFile(f);
+  });
+  // Global paste handler — only when modal is open
+  document.addEventListener('paste', e => {
+    if (!document.getElementById('screenshotModal').classList.contains('active')) return;
+    const items = e.clipboardData?.items || [];
+    for (const it of items) {
+      if (it.type.startsWith('image/')) {
+        ssHandleFile(it.getAsFile());
+        e.preventDefault();
+        return;
+      }
+    }
+  });
+}
+setTimeout(ssSetupHandlers, 1000);
+
+async function ssExtract() {
+  if (!ssCurrentImage) { toast('Upload gambar dulu', 'warn'); return; }
+  const key = localStorage.getItem('dashboard_gemini_key') || DEFAULT_API_KEYS.gemini;
+  if (!key) {
+    toast('Gemini API key kosong. Set di 🤖 AI -> Settings.', 'error', 5000);
+    return;
+  }
+  const btn = document.getElementById('ssExtractBtn');
+  btn.disabled = true;
+  btn.innerHTML = '⏳ Extracting...';
+  document.getElementById('ssResult').innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px;">🤖 Gemini sedang membaca screenshot...</div>';
+
+  // Strip data URL prefix
+  const base64 = ssCurrentImage.split(',')[1];
+  const mimeType = ssCurrentImage.match(/data:([^;]+);/)?.[1] || 'image/png';
+
+  const prompt = `Analisis screenshot ini dan extract SEMUA domain dengan metric SEO-nya.
+
+Untuk SETIAP domain yang terdeteksi, berikan data dalam format JSON array:
+[
+  {
+    "domain": "example.com",
+    "da": 25,
+    "pa": 30,
+    "dr": 22,
+    "ur": 18,
+    "ss": 1,
+    "bl": "5K",
+    "rd": "120",
+    "age": 5
+  }
+]
+
+Aturan:
+- domain HARUS lowercase, tanpa http://, tanpa www., tanpa trailing slash
+- da/pa/dr/ur/ss/age = integer (gunakan 0 kalau tidak terlihat)
+- bl/rd = string (boleh "5K", "12.3K", "1.2M", atau angka murni "1500")
+- Kalau Age dalam tahun terlihat (e.g. "5y", "5 years"), pakai angka (5)
+- Kalau ada kolom yang TIDAK terlihat di screenshot, set 0 atau ""
+- HANYA kembalikan JSON array, tanpa text lain, tanpa markdown code block
+
+Mulai extract:`;
+
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { text: prompt },
+            { inline_data: { mime_type: mimeType, data: base64 } }
+          ]
+        }]
+      })
+    });
+    const j = await res.json();
+    if (j.error) {
+      document.getElementById('ssResult').innerHTML = `<div style="color:#ef4444;">❌ Gemini error: ${j.error.message}</div>`;
+      btn.disabled = false;
+      btn.innerHTML = '🤖 Extract via Gemini AI';
+      return;
+    }
+    const text = j.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    // Try parse JSON from response (may have markdown wrap)
+    let jsonStr = text.trim();
+    jsonStr = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch (e) {
+      // Try to find array within text
+      const m = text.match(/\[[\s\S]*\]/);
+      if (m) {
+        try { parsed = JSON.parse(m[0]); } catch (e2) {
+          document.getElementById('ssResult').innerHTML = `<div style="color:#ef4444;">❌ Gagal parse response. Raw output:<br><pre style="background:var(--bg);padding:10px;border-radius:6px;font-size:11px;overflow:auto;max-height:300px;">${text.replace(/</g,'&lt;')}</pre></div>`;
+          btn.disabled = false;
+          btn.innerHTML = '🤖 Extract via Gemini AI';
+          return;
+        }
+      }
+    }
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      document.getElementById('ssResult').innerHTML = `<div style="color:#fbbf24;">⚠️ Tidak ada domain terdeteksi dalam screenshot.</div>`;
+      btn.disabled = false;
+      btn.innerHTML = '🤖 Extract via Gemini AI';
+      return;
+    }
+    // Show preview table + import button
+    const rows = parsed.map(p => `
+      <tr>
+        <td><input type="checkbox" class="ss-row" data-d='${JSON.stringify(p).replace(/'/g,"&#39;")}' checked></td>
+        <td>${p.domain || '—'}</td>
+        <td>${p.da||0}</td><td>${p.pa||0}</td><td>${p.dr||0}</td>
+        <td>${p.ur||0}</td><td>${p.ss||0}</td>
+        <td>${p.bl||'—'}</td><td>${p.rd||'—'}</td><td>${p.age||0}</td>
+      </tr>`).join('');
+    document.getElementById('ssResult').innerHTML = `
+      <div style="background:rgba(16,185,129,0.1);padding:10px;border-radius:8px;margin-bottom:10px;">
+        ✅ <b>${parsed.length} domain</b> terdeteksi. Centang yang mau di-import.
+      </div>
+      <div style="max-height:300px;overflow:auto;background:var(--bg);padding:8px;border-radius:6px;">
+        <table style="width:100%;font-size:12px;">
+          <thead><tr><th><input type="checkbox" id="ssAll" checked onchange="document.querySelectorAll('.ss-row').forEach(c=>c.checked=this.checked)"></th><th>Domain</th><th>DA</th><th>PA</th><th>DR</th><th>UR</th><th>SS</th><th>BL</th><th>RD</th><th>Age</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <button class="btn-success" onclick="ssImport()" style="margin-top:12px;font-weight:700;">✅ Import Selected ke Dashboard</button>
+    `;
+    btn.disabled = false;
+    btn.innerHTML = '🤖 Extract Lagi';
+  } catch (e) {
+    document.getElementById('ssResult').innerHTML = `<div style="color:#ef4444;">❌ Network error: ${e.message}</div>`;
+    btn.disabled = false;
+    btn.innerHTML = '🤖 Extract via Gemini AI';
+  }
+}
+
+function ssImport() {
+  const checked = document.querySelectorAll('.ss-row:checked');
+  if (checked.length === 0) { toast('Pilih minimal 1 domain', 'warn'); return; }
+  const custom = JSON.parse(localStorage.getItem('dashboard_custom_domains') || '[]');
+  let added = 0, skipped = 0;
+  checked.forEach(cb => {
+    try {
+      const p = JSON.parse(cb.dataset.d.replace(/&#39;/g, "'"));
+      if (!p.domain || !p.domain.includes('.')) return;
+      const dom = p.domain.toLowerCase().trim();
+      if (allData.find(x => x.domain === dom) || custom.find(x => x.domain === dom)) {
+        skipped++; return;
+      }
+      const entry = {
+        domain: dom,
+        da: parseInt(p.da)||0, pa: parseInt(p.pa)||0,
+        dr: parseInt(p.dr)||0, ur: parseInt(p.ur)||0,
+        ss: parseInt(p.ss)||0, bl: p.bl||'', rd: p.rd||'',
+        age: parseInt(p.age)||0,
+        nawala: '', notes: '', status: 'new', custom: true
+      };
+      custom.push(entry); allData.push(entry); added++;
+    } catch (e) {}
+  });
+  localStorage.setItem('dashboard_custom_domains', JSON.stringify(custom));
+  if (typeof logActivity === 'function') logActivity('SCREENSHOT_IMPORT', `${added} added, ${skipped} skipped`);
+  closeScreenshot();
+  applyFilters();
+  toast(`✅ ${added} domain ditambahkan, ${skipped} skipped`, 'success', 5000);
 }
 
 function confirmBulkImport(parsed) {
