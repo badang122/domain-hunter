@@ -1216,6 +1216,24 @@ Atau cukup list domain (auto-fill 0):
 example.com
 another.org
 mydomain.net"></textarea>
+
+    <!-- Optional Ref Domains list — applied ke semua yang di-import -->
+    <div style="margin-top:10px;padding:10px;background:rgba(6,182,212,0.08);border:1px solid rgba(6,182,212,0.3);border-radius:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:6px;">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#67e8f9;">
+          <span style="background:#06b6d4;color:#fff;padding:2px 8px;border-radius:6px;font-size:11px;">RD</span>
+          🔗 Referring Domains (Full list — opsional, apply ke SEMUA yg diimport):
+        </label>
+        <div style="display:flex;gap:4px;">
+          <button type="button" onclick="pasteToRDImport()" style="background:#6366f1;color:white;border:0;padding:3px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;">📋 Paste clipboard</button>
+          <button type="button" onclick="document.getElementById('pasteRDfull').value=''" style="background:#374151;color:white;border:0;padding:3px 10px;border-radius:6px;cursor:pointer;font-size:11px;">Clear</button>
+        </div>
+      </div>
+      <textarea id="pasteRDfull" rows="2" style="width:100%;font-family:monospace;font-size:13px;resize:vertical;"
+                placeholder="gravatar.com, adobe.com, behance.net, issuu.com, twitch.tv — kalau diisi, akan dipakai untuk SEMUA domain yg di-import (override kolom RD)"></textarea>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px;">💡 Kosongkan kalau RD udah ada di kolom text di atas.</div>
+    </div>
+
     <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
       <button onclick="pasteFromClipboard()" style="background:#6366f1;color:white;padding:8px 14px;border:0;border-radius:8px;cursor:pointer;font-weight:700;">📋 Baca Clipboard &amp; Auto-Import</button>
       <button class="btn-primary" onclick="pasteParseText()">🔍 Parse &amp; Preview</button>
@@ -1610,10 +1628,16 @@ mydomain.net"></textarea>
       </div>
       <!-- RD Full list textarea — di samping Age (full-width, wrap ke baris baru) -->
       <div style="flex:1 1 100%;margin-top:4px;padding:10px;background:rgba(6,182,212,0.08);border:1px solid rgba(6,182,212,0.3);border-radius:10px;">
-        <label style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:12px;font-weight:700;color:#67e8f9;">
-          <span style="background:#06b6d4;color:#fff;padding:2px 8px;border-radius:6px;font-size:11px;">RD</span>
-          🔗 Referring Domains (Full list — opsional):
-        </label>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:6px;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#67e8f9;">
+            <span style="background:#06b6d4;color:#fff;padding:2px 8px;border-radius:6px;font-size:11px;">RD</span>
+            🔗 Referring Domains (Full list — opsional):
+          </label>
+          <div style="display:flex;gap:4px;">
+            <button type="button" onclick="pasteToRDTextarea()" style="background:#6366f1;color:white;border:0;padding:3px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;">📋 Paste clipboard</button>
+            <button type="button" onclick="document.getElementById('newRDfull').value=''" style="background:#374151;color:white;border:0;padding:3px 10px;border-radius:6px;cursor:pointer;font-size:11px;">Clear</button>
+          </div>
+        </div>
         <textarea id="newRDfull" rows="2" style="width:100%;font-family:monospace;font-size:13px;resize:vertical;"
                   placeholder="Contoh: gravatar.com, adobe.com, behance.net, issuu.com, twitch.tv, gitlab.com, heylink.me, disqus.com — atau bebas teks apa saja"></textarea>
         <div style="font-size:11px;color:var(--muted);margin-top:4px;">💡 <b>Quick input</b>: isi kolom <b>RD</b> di atas (kecil) untuk angka/singkat. <b>Full list</b>: isi textarea ini untuk daftar lengkap. Kalau keduanya diisi, textarea dipakai.</div>
@@ -5703,6 +5727,33 @@ async function parseBulkImport(file) {
   reader.readAsArrayBuffer(file);
 }
 
+// Helper: paste clipboard ke RD textarea (Add Domain form)
+async function pasteToRDTextarea() {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (!text) { toast('Clipboard kosong', 'warn'); return; }
+    const ta = document.getElementById('newRDfull');
+    ta.value = text;
+    const count = text.split(/[,\n]/).map(s=>s.trim()).filter(Boolean).length;
+    toast(`📋 Pasted (${count} item)`, 'success', 2500);
+  } catch (e) {
+    toast('Gagal paste clipboard: ' + e.message, 'error');
+  }
+}
+
+// Helper: paste clipboard ke RD textarea (Import Paste Text modal)
+async function pasteToRDImport() {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (!text) { toast('Clipboard kosong', 'warn'); return; }
+    document.getElementById('pasteRDfull').value = text;
+    const count = text.split(/[,\n]/).map(s=>s.trim()).filter(Boolean).length;
+    toast(`📋 Pasted ke RD list (${count} item)`, 'success', 2500);
+  } catch (e) {
+    toast('Gagal paste clipboard: ' + e.message, 'error');
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════
 // 📋 PASTE TEXT IMPORT — parse text dari Docs/Excel/email (no AI)
 // ═══════════════════════════════════════════════════════════════
@@ -5847,6 +5898,8 @@ function pasteParseAndImport() {
 
 function pasteDoImport(rows) {
   if (!rows || rows.length === 0) { toast('Tidak ada domain valid untuk diimport', 'warn'); return; }
+  // Global RD list (optional) — apply ke semua domain yg di-import
+  const globalRD = (document.getElementById('pasteRDfull')?.value || '').trim();
   const custom = JSON.parse(localStorage.getItem('dashboard_custom_domains') || '[]');
   const deleted = JSON.parse(localStorage.getItem('dashboard_deleted_domains') || '[]');
   let added = 0, updated = 0, restored = 0;
@@ -5855,7 +5908,9 @@ function pasteDoImport(rows) {
     const dom = p.domain.toLowerCase().trim();
     const newData = {
       da: p.da||0, pa: p.pa||0, dr: p.dr||0, ur: p.ur||0,
-      ss: p.ss||0, bl: p.bl||'', rd: p.rd||'', age: p.age||0
+      ss: p.ss||0, bl: p.bl||'',
+      rd: globalRD || p.rd || '',
+      age: p.age||0
     };
     // Kalau domain di deleted list, hapus dari deleted (restore)
     const delIdx = deleted.indexOf(dom);
