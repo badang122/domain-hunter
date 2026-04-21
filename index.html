@@ -808,6 +808,15 @@
       </optgroup>
     </select>
 
+    <h3 style="margin:20px 0 8px;">🛠️ Tools</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;">
+      <button onclick="openKanban();closeSettings();" style="background:linear-gradient(135deg,#8b5cf6,#ec4899);color:white;font-weight:700;padding:10px;">📋 Kanban Board</button>
+      <button onclick="openROI();closeSettings();" style="background:linear-gradient(135deg,#10b981,#059669);color:white;font-weight:700;padding:10px;">💰 ROI Dashboard</button>
+      <button onclick="openAnalytics();closeSettings();" style="background:linear-gradient(135deg,#06b6d4,#3b82f6);color:white;font-weight:700;padding:10px;">📊 Portfolio Analytics</button>
+      <button onclick="bulkAliveCheck();closeSettings();" style="background:linear-gradient(135deg,#0891b2,#0369a1);color:white;font-weight:700;padding:10px;">🟢 Alive Check (Bulk)</button>
+      <button onclick="bulkRDAPAge();closeSettings();" style="background:linear-gradient(135deg,#ec4899,#be185d);color:white;font-weight:700;padding:10px;">📅 Fetch Age (RDAP)</button>
+    </div>
+
     <h3 style="margin:20px 0 8px;">📜 Aktivitas &amp; 👥 Anggota</h3>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
       <button onclick="openActivity()">📜 Activity Log</button>
@@ -1644,9 +1653,6 @@ mydomain.net"></textarea>
       <button class="btn-primary" onclick="openAI()">🤖 AI</button>
       <button class="btn-success" onclick="openCharts()">📊 Charts</button>
       <button onclick="openLeaderboard()" style="background:linear-gradient(135deg,#fbbf24,#f97316);color:white;font-weight:700;">🏆 Leaderboard</button>
-      <button onclick="openKanban()" style="background:linear-gradient(135deg,#8b5cf6,#ec4899);color:white;font-weight:700;">📋 Kanban</button>
-      <button onclick="openROI()" style="background:linear-gradient(135deg,#10b981,#059669);color:white;font-weight:700;">💰 ROI</button>
-      <button onclick="openAnalytics()" style="background:linear-gradient(135deg,#06b6d4,#3b82f6);color:white;font-weight:700;">📊 Analytics</button>
       <div class="import-menu" style="position:relative;display:inline-block;">
         <button onclick="toggleImportMenu(event)" style="background:linear-gradient(135deg,#059669,#3b82f6);color:white;font-weight:700;padding:8px 14px;border:0;border-radius:8px;cursor:pointer;">📥 Import ▼</button>
         <div id="importMenuDropdown" style="display:none;position:absolute;top:100%;left:0;margin-top:4px;background:var(--panel);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.4);z-index:1000;min-width:220px;overflow:hidden;">
@@ -1657,8 +1663,6 @@ mydomain.net"></textarea>
       </div>
       <button onclick="openFavorites()" data-i18n="fav">⭐ Fav</button>
       <button onclick="openNawalaDash()" class="btn-danger">🔴 Nawala</button>
-      <button onclick="bulkAliveCheck()" style="background:linear-gradient(135deg,#0891b2,#0369a1);color:white;font-weight:700;">🟢 Alive Check</button>
-      <button onclick="bulkRDAPAge()" style="background:linear-gradient(135deg,#ec4899,#be185d);color:white;font-weight:700;">📅 Fetch Age</button>
       <button id="expiryAlertBtn" onclick="showExpiringDomains()" style="display:none;background:#ef4444;color:white;font-weight:700;">⏰ <span id="expiryCount">0</span></button>
       <button onclick="logout()">Logout</button>
     </div>
