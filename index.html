@@ -1007,11 +1007,11 @@
       </div>
     </div>
 
-    <!-- Mode Selector -->
-    <div style="background:rgba(251,191,36,0.1);padding:12px;border-radius:8px;border:1px solid rgba(251,191,36,0.3);margin-bottom:14px;">
-      <b style="color:#fbbf24;">⚡ Mode Cek:</b>
-      <label style="margin-left:10px;"><input type="radio" name="nwMode" value="auto" checked> Auto (via proxy, kadang gagal)</label>
-      <label style="margin-left:10px;"><input type="radio" name="nwMode" value="manual"> 🚀 Semi-Manual (buka tab + tandai — PALING CEPAT)</label>
+    <!-- Mode Selector — Indonesian provider only -->
+    <div style="background:rgba(16,185,129,0.1);padding:12px;border-radius:8px;border:1px solid rgba(16,185,129,0.3);margin-bottom:14px;">
+      <b style="color:#34d399;">🇮🇩 Provider Indonesia:</b>
+      <label style="margin-left:10px;"><input type="radio" name="nwMode" value="auto" checked> Auto via <b>check.skiddle.id</b> (server-side cek vs Trust Positif Kominfo — 100% akurat)</label>
+      <label style="margin-left:10px;"><input type="radio" name="nwMode" value="manual"> 🚀 Semi-Manual (buka tab Trust Positif + tandai)</label>
     </div>
 
     <!-- Quick Actions -->
@@ -1035,7 +1035,7 @@
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
           <div>
             <b style="color:#fbbf24;">🚀 1-Click Auto-Generate</b>
-            <span style="color:var(--muted);font-size:12px;margin-left:6px;">(cek semua domain yang belum dicek, paralel 6 domain sekaligus)</span>
+            <span style="color:var(--muted);font-size:12px;margin-left:6px;">via 🇮🇩 <b>check.skiddle.id</b> — batch 30 domain/call (paling akurat sesuai Trust Positif aktual)</span>
           </div>
           <button class="btn-danger" onclick="autoGenerateAllNawala()" style="background:linear-gradient(135deg,#ef4444,#f59e0b);font-weight:700;">🚀 Auto-Gen Belum Dicek</button>
         </div>
@@ -2208,25 +2208,12 @@ async function checkNawalaViaImage(domain) {
 
 async function checkNawala(domain) {
   const status = document.getElementById('checkStatus');
-  if (status) status.innerHTML = `🔍 Cek Nawala <b>${domain}</b>...`;
+  if (status) status.innerHTML = `🔍 Cek Nawala <b>${domain}</b> via Skiddle (Indonesia)...`;
 
-  // PRIMARY: Skiddle API (server-side check vs Trust Positif list — 100% akurat)
+  // INDONESIAN PROVIDER ONLY — Skiddle.id (server-side cek vs Trust Positif aktual)
+  // Tidak pakai Google DoH / Cloudflare DNS / CORS proxy non-ID lagi
   const skiddleResult = await checkNawalaViaSkiddle(domain);
   if (skiddleResult) return skiddleResult;
-
-  // Fallback 1: DNS check (kalau Skiddle down)
-  const dnsResult = await checkNawalaViaDNS(domain);
-  if (dnsResult === 'blocked') return 'blocked';
-
-  // Fallback 2: CORS proxy
-  const proxyResult = await checkNawalaViaProxy(domain);
-  if (proxyResult) return proxyResult;
-
-  if (dnsResult === 'safe') return 'safe';
-
-  // Last resort: Image favicon check
-  const imgResult = await checkNawalaViaImage(domain);
-  if (imgResult === 'safe') return 'safe';
 
   return null;
 }
