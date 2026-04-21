@@ -1638,11 +1638,11 @@
         <th data-sort="da" data-col="da">DA</th>
         <th data-sort="pa" data-col="pa">PA</th>
         <th data-sort="ss" data-col="ss">SS</th>
+        <th data-sort="age" data-col="age">Age</th>
         <th data-sort="dr" data-col="dr">DR</th>
         <th data-sort="ur" data-col="ur">UR</th>
         <th data-sort="bl" data-col="bl">BL</th>
         <th data-sort="rd" data-col="rd">RD</th>
-        <th data-sort="age" data-col="age">Age</th>
         <th data-sort="nawala" data-col="nawala">Nawala</th>
         <th data-col="notes">Notes</th>
         <th data-col="check">Check</th>
@@ -1748,11 +1748,14 @@ let sortKey = 'score';
 let sortDir = 'desc';
 let sortKeys = []; // for multi-sort
 
-const COLS = ['sel','domain','score','status','da','pa','ss','dr','ur','bl','rd','age','nawala','notes','check'];
+const COLS = ['sel','domain','score','status','da','pa','ss','age','dr','ur','bl','rd','nawala','notes','check'];
 const COL_NAMES = { sel:'Select', domain:'Domain', score:'Score', status:'Status', da:'DA', pa:'PA', ss:'SS', dr:'DR', ur:'UR', bl:'BL', rd:'RD', age:'Age', nawala:'Nawala', notes:'Notes', check:'Actions' };
 // Force reset visibleCols kalau tidak punya UR/RD (migration)
 let visibleCols = JSON.parse(localStorage.getItem('dashboard_visible_cols') || 'null');
-if (!visibleCols || !visibleCols.includes('ur') || !visibleCols.includes('rd')) {
+// Check order match: DA, PA, SS, AGE, DR, UR, BL, RD (age sekarang setelah SS)
+const ageIdx = visibleCols?.indexOf('age');
+const drIdx = visibleCols?.indexOf('dr');
+if (!visibleCols || !visibleCols.includes('ur') || !visibleCols.includes('rd') || (ageIdx > drIdx)) {
   visibleCols = [...COLS];
   localStorage.setItem('dashboard_visible_cols', JSON.stringify(visibleCols));
 }
