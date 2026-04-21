@@ -544,7 +544,7 @@
   .music-player {
     position: fixed;
     bottom: 24px;
-    right: 24px;
+    left: 24px;
     z-index: 998;
     background: var(--panel);
     border: 1px solid var(--border);
@@ -648,11 +648,11 @@
     .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .check-link { padding: 2px 5px; font-size: 9px; }
     button { padding: 8px 12px; font-size: 12px; }
-    /* Floating widgets smaller on mobile */
-    #floatingTools { bottom: 12px; left: 12px; }
+    /* Floating widgets smaller on mobile (music kiri, tools kanan) */
+    #floatingTools { bottom: 12px; right: 12px; left: auto; }
     .ft-toggle { width: 44px; height: 44px; font-size: 18px; }
     .ft-widget:not(.collapsed) { min-width: 240px; padding: 10px; }
-    .music-player { bottom: 12px; right: 12px; min-width: unset; }
+    .music-player { bottom: 12px; left: 12px; right: auto; min-width: unset; }
     .music-player:not(.collapsed) { min-width: 220px; }
     /* Toast smaller */
     .toast { min-width: 240px; max-width: calc(100vw - 40px); font-size: 12px; padding: 10px 14px; }
@@ -1212,12 +1212,22 @@
   <div class="modal" style="width:620px;max-width:95vw;">
     <h2>🏠 Property — <span id="propDomain" style="color:#60a5fa;"></span> <button class="close" onclick="closeProp()">×</button></h2>
 
-    <!-- Pin toggle -->
-    <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:rgba(251,191,36,0.1);border-radius:8px;border:1px solid rgba(251,191,36,0.3);margin-bottom:16px;">
+    <!-- Pin + Star Rating row -->
+    <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:rgba(251,191,36,0.1);border-radius:8px;border:1px solid rgba(251,191,36,0.3);margin-bottom:16px;flex-wrap:wrap;">
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;">
-        <input type="checkbox" id="propPinned" style="width:18px;height:18px;"> 📌 Pin ke atas tabel
+        <input type="checkbox" id="propPinned" style="width:18px;height:18px;"> 📌 Pin ke atas
       </label>
-      <span style="color:var(--muted);font-size:12px;margin-left:auto;">Domain pinned tampil paling atas</span>
+      <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
+        <span style="color:var(--muted);font-size:12px;">⭐ Rating:</span>
+        <div id="propRatingStars" style="display:flex;gap:2px;font-size:22px;cursor:pointer;user-select:none;">
+          <span data-r="1" onclick="setPropRating(1)" style="color:#475569;">★</span>
+          <span data-r="2" onclick="setPropRating(2)" style="color:#475569;">★</span>
+          <span data-r="3" onclick="setPropRating(3)" style="color:#475569;">★</span>
+          <span data-r="4" onclick="setPropRating(4)" style="color:#475569;">★</span>
+          <span data-r="5" onclick="setPropRating(5)" style="color:#475569;">★</span>
+        </div>
+        <button type="button" onclick="setPropRating(0)" style="background:transparent;color:var(--muted);border:0;cursor:pointer;font-size:11px;" title="Clear rating">×</button>
+      </div>
     </div>
 
     <!-- Deal Tracker -->
@@ -1300,8 +1310,8 @@
 <!-- ═══ TOAST NOTIFICATION CONTAINER ═══ -->
 <div id="toastContainer" style="position:fixed;top:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:10px;pointer-events:none;"></div>
 
-<!-- ═══ FLOATING TOOLS — Sticky Notes + Pomodoro ═══ -->
-<div id="floatingTools" style="position:fixed;bottom:24px;left:24px;z-index:998;display:flex;flex-direction:column;gap:10px;align-items:flex-start;">
+<!-- ═══ FLOATING TOOLS — Sticky Notes + Pomodoro (kanan, music kiri) ═══ -->
+<div id="floatingTools" style="position:fixed;bottom:24px;right:24px;z-index:998;display:flex;flex-direction:column;gap:10px;align-items:flex-end;">
   <!-- Pomodoro Timer (collapsible) -->
   <div id="pomodoroWidget" class="ft-widget collapsed">
     <button class="ft-toggle" onclick="togglePomodoro()" title="Pomodoro Timer">
@@ -1544,6 +1554,16 @@
                   placeholder="Contoh: gravatar.com, adobe.com, behance.net, issuu.com, twitch.tv, gitlab.com, heylink.me, disqus.com — atau bebas teks apa saja"></textarea>
         <div style="font-size:11px;color:var(--muted);margin-top:4px;">💡 <b>Quick input</b>: isi kolom <b>RD</b> di atas (kecil) untuk angka/singkat. <b>Full list</b>: isi textarea ini untuk daftar lengkap. Kalau keduanya diisi, textarea dipakai.</div>
       </div>
+      <!-- Note inline textarea — opsional saat add domain -->
+      <div style="flex:1 1 100%;margin-top:4px;padding:10px;background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.3);border-radius:10px;">
+        <label style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:12px;font-weight:700;color:#fbbf24;">
+          <span style="background:#fbbf24;color:#1f2937;padding:2px 8px;border-radius:6px;font-size:11px;">📝</span>
+          Note (opsional):
+        </label>
+        <textarea id="newNotes" rows="2" style="width:100%;font-size:13px;resize:vertical;"
+                  placeholder="Catatan: harga, alasan beli, target buyer, niche idea, dll..."></textarea>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;">💡 Note bisa di-edit nanti via tombol 📝 di row tabel.</div>
+      </div>
       <button class="btn-success" onclick="addDomain(false)" style="height:40px;font-weight:700;">➕ Add</button>
       <button class="btn-primary" onclick="autoCheckDomain()" title="Buka Ahrefs, DAPAChecker, Nawala" style="height:40px;font-weight:700;">🔍 Auto-Check</button>
     </div>
@@ -1766,6 +1786,7 @@ function render() {
       domain: (() => {
         const meta = JSON.parse(localStorage.getItem('dashboard_meta') || '{}')[d.domain] || {};
         const pin = meta.pinned ? '<span class="pin-badge" title="Pinned">📌</span>' : '';
+        const rating = meta.rating > 0 ? `<span style="color:#fbbf24;font-size:11px;margin-right:4px;" title="Rating ${meta.rating}/5">${'★'.repeat(meta.rating)}</span>` : '';
         const tags = (meta.tags || '').split(',').map(t=>t.trim()).filter(Boolean);
         const tagChips = tags.slice(0,2).map(t=>`<span class="tag-chip" title="Tag: ${t}">${t}</span>`).join('');
         // Expiry warning
@@ -1776,7 +1797,7 @@ function render() {
           else if (days <= 30) expBadge = `<span class="expiry-soon" title="Expired dalam ${days} hari">⏰ ${days}d</span>`;
           else if (days <= 90) expBadge = `<span class="expiry-warn" title="Expired dalam ${days} hari">⏰ ${days}d</span>`;
         }
-        return `<td>${pin}<button class="fav-star ${isFav(d.domain)?'active':''}" onclick="toggleFav('${d.domain}')" title="Toggle favorite">${isFav(d.domain)?'⭐':'☆'}</button> <span class="domain" contenteditable="false">${d.domain}</span> ${tagChips}${expBadge}</td>`;
+        return `<td>${pin}${rating}<button class="fav-star ${isFav(d.domain)?'active':''}" onclick="toggleFav('${d.domain}')" title="Toggle favorite">${isFav(d.domain)?'⭐':'☆'}</button> <span class="domain" contenteditable="false">${d.domain}</span> ${tagChips}${expBadge}</td>`;
       })(),
       score: `<td><span class="score ${scoreColor(score)}">${score}</span></td>`,
       status: `<td>${renderStatus(d)}</td>`,
@@ -2703,7 +2724,10 @@ async function addDomain(withAutoCheck = false) {
       if (!v || v === '-' || v === '—' || v === 'tidak tahu') return '—'; // unknown
       return parseInt(v) || 0;
     })(),
-    nawala: '', status: 'new', notes: '', custom: true
+    nawala: '',
+    notes: (document.getElementById('newNotes')?.value || '').trim(),
+    status: 'new',
+    custom: true
   };
 
   const status = document.getElementById('checkStatus');
@@ -2713,8 +2737,10 @@ async function addDomain(withAutoCheck = false) {
   custom.unshift(newEntry);
   localStorage.setItem('dashboard_custom_domains', JSON.stringify(custom));
   allData.unshift(newEntry);
+  // Save notes ke meta juga (biar konsisten dengan flow edit nanti)
+  if (newEntry.notes) saveMeta(newEntry.domain, { notes: newEntry.notes });
 
-  ['newDomain','newDA','newPA','newSS','newDR','newUR','newBL','newAge','newRD','newRDfull'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  ['newDomain','newDA','newPA','newSS','newDR','newUR','newBL','newAge','newRD','newRDfull','newNotes'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
 
   applyFilters();
 
@@ -4874,11 +4900,21 @@ let currentPropDomain = '';
 let activeTagFilter = '';
 let activeExpiryFilter = false;
 
+let currentPropRating = 0;
+function setPropRating(r) {
+  currentPropRating = r;
+  document.querySelectorAll('#propRatingStars span').forEach(s => {
+    const v = parseInt(s.dataset.r);
+    s.style.color = v <= r ? '#fbbf24' : '#475569';
+  });
+}
+
 function openProp(domain) {
   currentPropDomain = domain;
   const meta = JSON.parse(localStorage.getItem('dashboard_meta') || '{}')[domain] || {};
   document.getElementById('propDomain').textContent = domain;
   document.getElementById('propPinned').checked = !!meta.pinned;
+  setPropRating(meta.rating || 0);
   document.getElementById('propBuyPrice').value = meta.buyPrice || '';
   document.getElementById('propTargetPrice').value = meta.targetPrice || '';
   document.getElementById('propCurrentOffer').value = meta.currentOffer || '';
@@ -4928,6 +4964,7 @@ function saveProp() {
   if (!currentPropDomain) return;
   const updates = {
     pinned: document.getElementById('propPinned').checked,
+    rating: currentPropRating || 0,
     buyPrice: document.getElementById('propBuyPrice').value || '',
     targetPrice: document.getElementById('propTargetPrice').value || '',
     currentOffer: document.getElementById('propCurrentOffer').value || '',
