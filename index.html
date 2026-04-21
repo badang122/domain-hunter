@@ -1252,10 +1252,12 @@
     <h2>📋 Import dari Paste Text (copy dari Docs/Word/Email/Excel) <button class="close" onclick="closePasteImport()">×</button></h2>
     <div style="background:rgba(59,130,246,0.1);padding:10px;border-radius:8px;border:1px solid rgba(59,130,246,0.3);margin-bottom:14px;font-size:13px;">
       💡 Copy list domain dari dokumen apa saja (Word, Google Docs, Excel, email) → paste di bawah. Auto-detect format:
-      <br>• <b>TSV</b> (tab-separated): <code>domain.com    25    30    22    ...</code>
-      <br>• <b>CSV</b> (comma): <code>domain.com, 25, 30, 22, ...</code>
+      <br>• <b>TSV</b> (tab): <code>domain.com⇥25⇥30⇥22...</code>
       <br>• <b>Space</b>: <code>domain.com 25 30 22 ...</code>
-      <br>• <b>List only</b>: satu domain per baris (metrics kosong)
+      <br>• <b>List only</b>: satu domain per baris
+    </div>
+    <div style="background:rgba(52,211,153,0.12);padding:10px;border-radius:8px;border:1px solid rgba(52,211,153,0.3);margin-bottom:14px;font-size:12px;color:#6ee7b7;">
+      💾 <b>Data tersimpan PERMANEN</b> di browser (localStorage). Tidak hilang meski tutup browser. Hanya hilang kalau kamu Clear Browser Data atau hapus manual via 🗑/💀. Sarankan <a href="#" onclick="event.preventDefault();pasteBackupJSON();" style="color:#34d399;text-decoration:underline;">download backup JSON</a> tiap minggu biar aman.
     </div>
     <textarea id="pasteText" rows="10" style="width:100%;font-family:monospace;font-size:13px;"
               placeholder="Contoh:
@@ -5900,6 +5902,28 @@ function pasteParseRows(text) {
   return rows;
 }
 
+// Backup semua data (domain + meta + deleted + tags) sebagai JSON file
+function pasteBackupJSON() {
+  const backup = {
+    exportedAt: new Date().toISOString(),
+    version: '2.1',
+    custom_domains: JSON.parse(localStorage.getItem('dashboard_custom_domains') || '[]'),
+    meta: JSON.parse(localStorage.getItem('dashboard_meta') || '{}'),
+    deleted: JSON.parse(localStorage.getItem('dashboard_deleted_domains') || '[]'),
+    blocked: JSON.parse(localStorage.getItem('dashboard_blocked_domains') || '[]'),
+    nawalaHistory: JSON.parse(localStorage.getItem('dashboard_nawala_history') || '{}'),
+    favorites: JSON.parse(localStorage.getItem('dashboard_favorites') || '[]'),
+    members: JSON.parse(localStorage.getItem('dashboard_members') || '[]'),
+  };
+  const totalDomains = backup.custom_domains.length;
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `domain-hunter-backup-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  toast(`💾 Backup downloaded: ${totalDomains} domain`, 'success', 4000);
+}
+
 // Read text dari clipboard + auto-import (tanpa perlu paste manual)
 async function pasteFromClipboard() {
   try {
@@ -5972,10 +5996,10 @@ function pasteParseAndImport() {
 
 function pasteDoImport(rows) {
   if (!rows || rows.length === 0) { toast('Tidak ada domain valid untuk diimport', 'warn'); return; }
-  // Global RD list (optional) — apply ke semua domain yg di-import
   const globalRD = (document.getElementById('pasteRDfull')?.value || '').trim();
   const custom = JSON.parse(localStorage.getItem('dashboard_custom_domains') || '[]');
   const deleted = JSON.parse(localStorage.getItem('dashboard_deleted_domains') || '[]');
+  const meta = JSON.parse(localStorage.getItem('dashboard_meta') || '{}');
   let added = 0, updated = 0, restored = 0;
   const addedDomains = [];
   rows.forEach(p => {
@@ -5986,6 +6010,8 @@ function pasteDoImport(rows) {
       rd: globalRD || p.rd || '',
       age: p.age||0
     };
+    // PENTING: preserve existing meta (notes, tags, rating, pinned, deal, expiry) — JANGAN di-overwrite
+    // Hanya metric yang di-update (DA, PA, DR, UR, SS, BL, RD, Age)
     // Kalau domain di deleted list, hapus dari deleted (restore)
     const delIdx = deleted.indexOf(dom);
     if (delIdx >= 0) { deleted.splice(delIdx, 1); restored++; }
@@ -6016,18 +6042,18 @@ function pasteDoImport(rows) {
   localStorage.setItem('dashboard_deleted_domains', JSON.stringify(deleted));
   localStorage.setItem('dashboard_custom_domains', JSON.stringify(custom));
   if (typeof logActivity === 'function') logActivity('PASTE_IMPORT', `${added} added, ${updated} updated, ${restored} restored`);
-  console.log('[PasteImport]', { added, updated, restored, addedDomains, totalNow: allData.length });
+  // Verify localStorage actually saved
+  const saved = JSON.parse(localStorage.getItem('dashboard_custom_domains') || '[]');
+  console.log('[PasteImport] Permanent save verified:', { added, updated, restored, addedDomains, totalNow: allData.length, localStorageCount: saved.length });
   closePasteImport();
-  // Reset filter kalau import hasilnya tidak kelihatan karena filter aktif
   const prevCount = filteredData.length;
   applyFilters();
+  const finalCount = allData.length;
   if (added > 0 && filteredData.length === prevCount) {
-    // Kemungkinan filter hide domain baru — reset filter
     if (typeof resetFilters === 'function') resetFilters();
-    toast(`📋 Import: ${added} baru, ${updated} update · filter di-reset karena sembunyikan hasil`, 'success', 5000);
-  } else {
-    toast(`📋 Import: ${added} baru, ${updated} update`, 'success', 5000);
   }
+  // Toast dengan info permanen
+  toast(`💾 ${added} baru + ${updated} update · tersimpan PERMANEN (total: ${finalCount} domain)`, 'success', 6000);
 }
 
 // ═══════════════════════════════════════════════════════════════
