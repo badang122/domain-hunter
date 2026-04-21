@@ -1270,24 +1270,7 @@ example.com
 another.org
 mydomain.net"></textarea>
 
-    <div style="font-size:11px;color:var(--muted);margin-top:6px;">💡 Kolom terakhir (angka) = RD count. Contoh: <code>domain.com 48 21 25 1 24 7 2,040 <b style="color:#67e8f9;">439</b></code> → 439 di-save sebagai RD.</div>
-
-    <!-- Good Backlink textarea — opsional, apply ke semua yang di-import -->
-    <div style="margin-top:12px;padding:10px;background:rgba(6,182,212,0.08);border:1px solid rgba(6,182,212,0.3);border-radius:10px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:6px;">
-        <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#67e8f9;">
-          <span style="background:#06b6d4;color:#fff;padding:2px 8px;border-radius:6px;font-size:11px;">RD</span>
-          🔗 Good Backlink (Full list — opsional):
-        </label>
-        <div style="display:flex;gap:4px;">
-          <button type="button" onclick="pasteToRDImport()" style="background:#6366f1;color:white;border:0;padding:3px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;">📋 Paste clipboard</button>
-          <button type="button" onclick="document.getElementById('pasteRDfull').value=''" style="background:#374151;color:white;border:0;padding:3px 10px;border-radius:6px;cursor:pointer;font-size:11px;">Clear</button>
-        </div>
-      </div>
-      <textarea id="pasteRDfull" rows="2" style="width:100%;font-family:monospace;font-size:13px;resize:vertical;"
-                placeholder="gravatar.com, adobe.com, behance.net, issuu.com, twitch.tv, gitlab.com, heylink.me — kalau diisi, akan di-save ke Notes semua domain yang di-import"></textarea>
-      <div style="font-size:11px;color:var(--muted);margin-top:4px;">💡 Good Backlink list akan disimpan di <b>Notes</b> setiap domain (tidak mengganggu RD count).</div>
-    </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:6px;">💡 Format per row: <code>domain.com  DA PA SS Age DR UR BL <b style="color:#67e8f9;">RD</b>  <b style="color:#34d399;">goodBL1, goodBL2, goodBL3...</b></code><br>Contoh: <code>nlcfpc.org  29 35 28 1 32 4.9 4,397 <b style="color:#67e8f9;">538</b>  <b style="color:#34d399;">gravatar.com, issuu.com, huffpost.com</b></code> → <b style="color:#67e8f9;">538</b> = RD, <b style="color:#34d399;">gravatar.com,...</b> = GoodBL</div>
 
     <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
       <button onclick="pasteFromClipboard()" style="background:#6366f1;color:white;padding:8px 14px;border:0;border-radius:8px;cursor:pointer;font-weight:700;">📋 Baca Clipboard &amp; Auto-Import</button>
@@ -5968,7 +5951,7 @@ function pasteParseRows(text) {
     const row = {
       domain: firstDomain,
       da: 0, pa: 0, ss: 0, dr: 0, ur: 0, age: 0,
-      bl: '', rd: ''
+      bl: '', rd: '', goodbl: ''
     };
     // Try to parse columns
     // parseNum supports "2,040" → 2040, "-" → 0, empty → 0
@@ -5979,7 +5962,7 @@ function pasteParseRows(text) {
       return isNaN(n) ? 0 : n;
     };
     const cols = parts.slice(1);
-    // Pattern: domain, DA, PA, SS, Age, DR, UR, BL, RD (count), [Ref Domains List...]
+    // Pattern: domain, DA, PA, SS, Age, DR, UR, BL, RD (count), [Good Backlink List...]
     if (cols.length >= 5) {
       row.da = Math.round(parseN(cols[0]));
       row.pa = Math.round(parseN(cols[1]));
@@ -5988,14 +5971,10 @@ function pasteParseRows(text) {
       row.dr = Math.round(parseN(cols[4]));
       if (cols[5] !== undefined) row.ur = parseN(cols[5]);
       if (cols[6] !== undefined) row.bl = String(cols[6]).trim();
-      const rdCount = cols[7] !== undefined ? String(cols[7]).trim() : '';
-      // Kolom 9+ = ref domains list (optional, save ke notes biar tidak gantiin rd count)
-      const refListCols = cols.slice(8).filter(Boolean);
-      const refList = refListCols.length > 0 ? refListCols.join(' ').trim() : '';
-      // RD field = angka count (bukan list). Kalau list diberikan tanpa count, pakai list.
-      row.rd = rdCount || refList;
-      // Ref list disimpan sebagai note (opsional, biar ga hilang)
-      if (refList && rdCount) row.notes = (row.notes || '') + '🔗 Ref domains: ' + refList;
+      row.rd = cols[7] !== undefined ? String(cols[7]).trim() : '';
+      // Kolom 9+ = Good Backlink list (langsung masuk ke field goodbl)
+      const goodBLCols = cols.slice(8).filter(Boolean);
+      if (goodBLCols.length > 0) row.goodbl = goodBLCols.join(' ').trim();
     } else if (cols.length === 1) {
       row.da = Math.round(parseN(cols[0]));
     } else if (cols.length === 2) {
@@ -6106,8 +6085,6 @@ function pasteParseAndImport() {
 
 function pasteDoImport(rows) {
   if (!rows || rows.length === 0) { toast('Tidak ada domain valid untuk diimport', 'warn'); return; }
-  // Good Backlink list — apply ke semua imported domains (save ke notes)
-  const globalGoodBL = (document.getElementById('pasteRDfull')?.value || '').trim();
   const custom = JSON.parse(localStorage.getItem('dashboard_custom_domains') || '[]');
   const deleted = JSON.parse(localStorage.getItem('dashboard_deleted_domains') || '[]');
   const meta = JSON.parse(localStorage.getItem('dashboard_meta') || '{}');
@@ -6120,7 +6097,7 @@ function pasteDoImport(rows) {
       ss: p.ss||0, bl: p.bl||'',
       rd: p.rd || '',
       age: p.age||0,
-      goodbl: globalGoodBL || p.goodbl || ''
+      goodbl: p.goodbl || ''
     };
     // Preserve existing meta saat update (jangan overwrite)
     // Kalau domain di deleted list, hapus dari deleted (restore)
