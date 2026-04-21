@@ -1892,8 +1892,26 @@ console.log('[Dashboard Init]', {
   customDomainsBackup: JSON.parse(localStorage.getItem('dashboard_custom_domains_backup') || '[]').length,
   deletedDomains: deletedDomains.length,
   origin: location.origin,
+  href: location.href,
   lastSave: localStorage.getItem('dashboard_custom_domains_timestamp')
 });
+
+// URL WARNING — tampilkan banner kalau user di preview URL (bukan production)
+// Production: https://domain-hunter-2pp.pages.dev/
+// Preview: https://<hash>.domain-hunter-2pp.pages.dev/ (URL hash berubah tiap push)
+const EXPECTED_HOSTS = ['domain-hunter-2pp.pages.dev', 'domain-hunter.pages.dev'];
+const currentHost = location.hostname;
+if (!EXPECTED_HOSTS.includes(currentHost) && currentHost.includes('pages.dev')) {
+  setTimeout(() => {
+    const warn = document.createElement('div');
+    warn.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#f59e0b;color:#1f2937;padding:10px;text-align:center;z-index:99999;font-weight:700;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,0.3);';
+    warn.innerHTML = `⚠️ Kamu di PREVIEW URL: <code>${currentHost}</code> — data di sini TERPISAH dari production. Buka <a href="https://domain-hunter-2pp.pages.dev/" style="color:#1e40af;text-decoration:underline;font-weight:900;">domain-hunter-2pp.pages.dev</a> untuk akses data permanent. <button onclick="this.parentElement.remove()" style="margin-left:10px;padding:2px 8px;">×</button>`;
+    document.body.appendChild(warn);
+  }, 1000);
+}
+
+// AUTO-BACKUP — download JSON otomatis ke browser tiap 10 import (via counter localStorage)
+// User bisa toggle off di console: localStorage.setItem('dashboard_autobackup_off','1')
 
 allData = [...customDomains, ...allData.filter(d => !customDomains.find(c => c.domain === d.domain))]
   .filter(d => !deletedDomains.includes(d.domain))
