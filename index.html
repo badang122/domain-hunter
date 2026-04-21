@@ -5796,11 +5796,39 @@ Mulai extract:`;
         ]
       }]
     });
-    const res = userKey
-      ? await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${userKey}`, {
-          method: 'POST', headers: {'Content-Type': 'application/json'}, body: reqBody })
-      : await fetch('/api/gemini', {
-          method: 'POST', headers: {'Content-Type': 'application/json'}, body: reqBody });
+    // Try beberapa model — fallback kalau yang pertama overload
+    const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+    let res = null, lastErr = '';
+    for (const model of models) {
+      const url = userKey
+        ? `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${userKey}`
+        : '/api/gemini';
+      const bodyWithModel = userKey ? reqBody : JSON.stringify({ ...JSON.parse(reqBody), model });
+      try {
+        res = await fetch(url, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: bodyWithModel });
+        if (res.ok) break;
+        // Check if overload/retry-able
+        const errData = await res.clone().json().catch(() => ({}));
+        const msg = (errData.error?.message || '').toLowerCase();
+        if (msg.includes('high demand') || msg.includes('overloaded') || res.status === 503 || res.status === 429) {
+          lastErr = `${model}: ${errData.error?.message || 'overload'}`;
+          document.getElementById('ssResult').innerHTML =
+            `<div style="color:#fbbf24;">⚠️ ${model} overload, fallback ke model berikutnya...</div>`;
+          continue; // try next model
+        }
+        // Other error — break out
+        break;
+      } catch (fe) {
+        lastErr = `${model}: ${fe.message}`;
+        continue;
+      }
+    }
+    if (!res || !res.ok) {
+      document.getElementById('ssResult').innerHTML = `<div style="color:#ef4444;">❌ Semua Gemini model overload/error. Coba lagi 1-2 menit.<br><small>${lastErr}</small></div>`;
+      btn.disabled = false;
+      btn.innerHTML = '🤖 Extract (preview)';
+      return;
+    }
     const j = await res.json();
     if (j.error) {
       document.getElementById('ssResult').innerHTML = `<div style="color:#ef4444;">❌ Gemini error: ${j.error.message}</div>`;
