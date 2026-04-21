@@ -1871,6 +1871,43 @@ allData = [...customDomains, ...allData.filter(d => !customDomains.find(c => c.d
 
 console.log('[Dashboard Init] Final allData count:', allData.length);
 
+// SAFETY NET: kalau localStorage punya data tapi allData kosong = bug, auto-fix
+if (customDomains.length > 0 && allData.length === 0) {
+  console.warn('[Dashboard Init] ⚠️ Mismatch detected — re-hydrating from localStorage');
+  allData = customDomains.filter(d => !deletedDomains.includes(d.domain) && !blockedDomains.includes(d.domain));
+}
+
+// Window debug function — bisa dipanggil dari console
+window.debugData = function() {
+  const custom = JSON.parse(localStorage.getItem('dashboard_custom_domains') || '[]');
+  const deleted = JSON.parse(localStorage.getItem('dashboard_deleted_domains') || '[]');
+  const blocked = JSON.parse(localStorage.getItem('dashboard_blocked_domains') || '[]');
+  const m = JSON.parse(localStorage.getItem('dashboard_meta') || '{}');
+  return {
+    origin: location.origin,
+    url: location.href,
+    allData: allData.length,
+    filteredData: filteredData.length,
+    localStorage: {
+      custom_domains: custom.length,
+      deleted_domains: deleted.length,
+      blocked_domains: blocked.length,
+      meta_keys: Object.keys(m).length,
+      total_keys: Object.keys(localStorage).length,
+      size_kb: Math.round(JSON.stringify(localStorage).length / 1024)
+    },
+    first5custom: custom.slice(0,5).map(d => d.domain)
+  };
+};
+// Force rebuild allData dari localStorage custom
+window.forceRebuild = function() {
+  const custom = JSON.parse(localStorage.getItem('dashboard_custom_domains') || '[]');
+  const deleted = JSON.parse(localStorage.getItem('dashboard_deleted_domains') || '[]');
+  allData = custom.filter(d => !deleted.includes(d.domain));
+  if (typeof applyFilters === 'function') applyFilters();
+  return 'Rebuilt: ' + allData.length + ' domain';
+};
+
 let filteredData = [...allData];
 let sortKey = 'score';
 let sortDir = 'desc';
