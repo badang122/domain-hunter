@@ -5877,31 +5877,44 @@ Mulai extract:`;
     // Auto-import mode: langsung import semua tanpa preview
     if (autoImport) {
       const custom = JSON.parse(localStorage.getItem('dashboard_custom_domains') || '[]');
-      let added = 0, skipped = 0;
+      let added = 0, updated = 0, invalid = 0;
+      const addedList = [], updatedList = [];
       parsed.forEach(p => {
-        if (!p.domain || !p.domain.includes('.')) return;
-        const dom = p.domain.toLowerCase().trim();
-        if (allData.find(x => x.domain === dom) || custom.find(x => x.domain === dom)) {
-          skipped++; return;
+        if (!p.domain || typeof p.domain !== 'string' || !p.domain.includes('.')) {
+          invalid++; return;
         }
+        const dom = p.domain.toLowerCase().trim();
         const refList = (p.refDomains || '').trim();
         const rdCount = (p.rd || '').trim();
-        const entry = {
-          domain: dom,
+        const newData = {
           da: parseInt(p.da)||0, pa: parseInt(p.pa)||0,
           dr: parseInt(p.dr)||0, ur: parseInt(p.ur)||0,
           ss: parseInt(p.ss)||0, bl: p.bl||'',
           rd: refList || rdCount,
-          age: parseInt(p.age)||0,
-          nawala: '', notes: '', status: 'new', custom: true
+          age: parseInt(p.age)||0
         };
-        custom.push(entry); allData.push(entry); added++;
+        // Cek existing — kalau ada, UPDATE metrics-nya
+        const existingAll = allData.find(x => x.domain === dom);
+        const existingCustom = custom.findIndex(x => x.domain === dom);
+        if (existingAll || existingCustom >= 0) {
+          if (existingAll) Object.assign(existingAll, newData);
+          if (existingCustom >= 0) Object.assign(custom[existingCustom], newData);
+          saveMeta(dom, newData);
+          updated++; updatedList.push(dom);
+        } else {
+          const entry = { domain: dom, ...newData, nawala: '', notes: '', status: 'new', custom: true };
+          custom.push(entry); allData.push(entry);
+          added++; addedList.push(dom);
+        }
       });
       localStorage.setItem('dashboard_custom_domains', JSON.stringify(custom));
-      if (typeof logActivity === 'function') logActivity('SCREENSHOT_AUTO_IMPORT', `${added} added, ${skipped} skipped`);
+      if (typeof logActivity === 'function') logActivity('SCREENSHOT_AUTO_IMPORT', `${added} added, ${updated} updated, ${invalid} invalid`);
       closeScreenshot();
       applyFilters();
-      toast(`⚡ Auto-import selesai: ${added} domain baru + ${skipped} sudah ada`, 'success', 6000);
+      console.log('[ScreenshotImport]', { added, updated, invalid, addedList, updatedList, parsed });
+      let msg = `⚡ Auto-import: ${added} baru, ${updated} update`;
+      if (invalid > 0) msg += `, ${invalid} invalid`;
+      toast(msg, 'success', 6000);
       return;
     }
     // Show preview table + import button
