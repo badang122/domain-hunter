@@ -2066,22 +2066,33 @@ const NAWALA_BLOCK_IPS = [
   '127.0.0.1', '0.0.0.0',
 ];
 
-// Primary method: Skiddle API (server-side check ke list Trust Positif aktual)
+// Primary method: Skiddle API (Indonesia, server-side check vs Trust Positif)
 // API: https://check.skiddle.id/?domain=X&json=true
 async function checkNawalaViaSkiddle(domain) {
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 8000);
+    const timer = setTimeout(() => controller.abort(), 12000);
     const res = await fetch(`https://check.skiddle.id/?domain=${encodeURIComponent(domain)}&json=true`, {
-      signal: controller.signal
+      signal: controller.signal,
+      method: 'GET',
+      mode: 'cors'
     });
     clearTimeout(timer);
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.warn('[Skiddle]', domain, 'HTTP', res.status);
+      return null;
+    }
     const data = await res.json();
-    const result = data[domain];
-    if (!result || typeof result.blocked !== 'boolean') return null;
+    const result = data[domain] || data[domain.toLowerCase()];
+    if (!result || typeof result.blocked !== 'boolean') {
+      console.warn('[Skiddle]', domain, 'unexpected response:', data);
+      return null;
+    }
     return result.blocked ? 'blocked' : 'safe';
-  } catch (e) { return null; }
+  } catch (e) {
+    console.warn('[Skiddle]', domain, 'error:', e.message || e);
+    return null;
+  }
 }
 
 // Bulk batch via Skiddle (max 30 per call)
@@ -2090,20 +2101,31 @@ async function checkNawalaViaSkiddleBulk(domains) {
   const batch = domains.slice(0, 30);
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 15000);
-    const res = await fetch(`https://check.skiddle.id/?domains=${batch.map(encodeURIComponent).join(',')}&json=true`, {
-      signal: controller.signal
-    });
+    const timer = setTimeout(() => controller.abort(), 20000);
+    const url = `https://check.skiddle.id/?domains=${batch.map(encodeURIComponent).join(',')}&json=true`;
+    const res = await fetch(url, { signal: controller.signal, method: 'GET', mode: 'cors' });
     clearTimeout(timer);
-    if (!res.ok) return {};
+    if (!res.ok) {
+      console.warn('[Skiddle bulk] HTTP', res.status);
+      // Fallback: per-domain individual call
+      const out = {};
+      for (const d of batch) {
+        const r = await checkNawalaViaSkiddle(d);
+        if (r) out[d] = r;
+      }
+      return out;
+    }
     const data = await res.json();
     const result = {};
     for (const d of batch) {
-      const r = data[d];
+      const r = data[d] || data[d.toLowerCase()];
       if (r && typeof r.blocked === 'boolean') result[d] = r.blocked ? 'blocked' : 'safe';
     }
     return result;
-  } catch (e) { return {}; }
+  } catch (e) {
+    console.warn('[Skiddle bulk] error:', e.message || e);
+    return {};
+  }
 }
 
 async function checkNawalaViaBackend(domain) {
