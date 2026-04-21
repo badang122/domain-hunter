@@ -1195,6 +1195,36 @@
   </div>
 </div>
 
+<!-- ═══ PASTE TEXT IMPORT MODAL ═══ -->
+<div class="modal-overlay" id="pasteImportModal">
+  <div class="modal" style="width:780px;max-width:96vw;max-height:90vh;overflow-y:auto;">
+    <h2>📋 Import dari Paste Text (copy dari Docs/Word/Email/Excel) <button class="close" onclick="closePasteImport()">×</button></h2>
+    <div style="background:rgba(59,130,246,0.1);padding:10px;border-radius:8px;border:1px solid rgba(59,130,246,0.3);margin-bottom:14px;font-size:13px;">
+      💡 Copy list domain dari dokumen apa saja (Word, Google Docs, Excel, email) → paste di bawah. Auto-detect format:
+      <br>• <b>TSV</b> (tab-separated): <code>domain.com    25    30    22    ...</code>
+      <br>• <b>CSV</b> (comma): <code>domain.com, 25, 30, 22, ...</code>
+      <br>• <b>Space</b>: <code>domain.com 25 30 22 ...</code>
+      <br>• <b>List only</b>: satu domain per baris (metrics kosong)
+    </div>
+    <textarea id="pasteText" rows="10" style="width:100%;font-family:monospace;font-size:13px;"
+              placeholder="Contoh:
+example.com	25	30	22	18	1	5K	120	5
+another.org	40	45	35	28	2	12K	300	8
+mydomain.net	18	20	15	12	3	2K	50	3
+
+Atau cukup list domain (auto-fill 0):
+example.com
+another.org
+mydomain.net"></textarea>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn-primary" onclick="pasteParseText()">🔍 Parse &amp; Preview</button>
+      <button onclick="pasteParseAndImport()" style="background:linear-gradient(135deg,#10b981,#059669);color:white;padding:8px 14px;border:0;border-radius:8px;cursor:pointer;font-weight:700;">⚡ Parse &amp; Auto-Import SEMUA</button>
+      <button class="btn-danger" onclick="document.getElementById('pasteText').value=''">Clear</button>
+    </div>
+    <div id="pasteResult" style="margin-top:14px;"></div>
+  </div>
+</div>
+
 <!-- ═══ SCREENSHOT IMPORT MODAL — extract via Gemini Vision ═══ -->
 <div class="modal-overlay" id="screenshotModal">
   <div class="modal" style="width:780px;max-width:96vw;max-height:90vh;overflow-y:auto;">
@@ -1482,6 +1512,7 @@
       <button onclick="openLeaderboard()" style="background:linear-gradient(135deg,#fbbf24,#f97316);color:white;font-weight:700;">🏆 Leaderboard</button>
       <button onclick="openBulkImport()" style="background:linear-gradient(135deg,#059669,#047857);color:white;">📥 Import Excel</button>
       <button onclick="openScreenshot()" style="background:linear-gradient(135deg,#3b82f6,#1e40af);color:white;">📸 Import Screenshot</button>
+      <button onclick="openPasteImport()" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:white;">📋 Import Paste Text</button>
       <button id="currencyToggle" onclick="toggleCurrency()" title="Toggle IDR/USD" style="padding:8px 12px;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:8px;cursor:pointer;font-weight:700;">IDR</button>
       <select id="langSelect" onchange="changeLang(this.value)" title="Ganti bahasa / Change language / Изменить язык / Cambiar idioma"
               style="padding:8px 12px; background:var(--panel); border:1px solid var(--border); color:var(--text); border-radius:8px; cursor:pointer; font-weight:600;">
@@ -5655,6 +5686,139 @@ async function parseBulkImport(file) {
     }
   };
   reader.readAsArrayBuffer(file);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 📋 PASTE TEXT IMPORT — parse text dari Docs/Excel/email (no AI)
+// ═══════════════════════════════════════════════════════════════
+function openPasteImport() {
+  document.getElementById('pasteImportModal').classList.add('active');
+  document.getElementById('pasteResult').innerHTML = '';
+}
+function closePasteImport() { document.getElementById('pasteImportModal').classList.remove('active'); }
+
+// Auto-detect separator + parse rows
+function pasteParseRows(text) {
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const rows = [];
+  for (const line of lines) {
+    // Detect separator: tab > comma+space > comma > pipe > multi-space
+    let parts;
+    if (line.includes('\t')) parts = line.split(/\t+/);
+    else if (line.includes('|')) parts = line.split(/\s*\|\s*/);
+    else if (/,\s/.test(line)) parts = line.split(/,\s+/);
+    else if (line.includes(',')) parts = line.split(/,/);
+    else parts = line.split(/\s{2,}|\s+/);
+    parts = parts.map(p => p.trim()).filter(p => p !== '');
+    if (parts.length === 0) continue;
+
+    // First part should be domain
+    const firstDomain = parts[0].toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '');
+    if (!firstDomain.includes('.') || firstDomain.length < 4) continue;
+    // Skip header-like rows
+    if (/^(domain|url|site|name)$/i.test(parts[0])) continue;
+
+    // Columns: domain, [DA, PA, SS, Age, DR, UR, BL, RD] OR [DA, PA, DR, UR, SS, BL, RD, Age]
+    // Auto-map — first numeric = DA, etc. For 1-col: just domain.
+    const num = v => { const n = parseInt(v); return isNaN(n) ? null : n; };
+    const row = {
+      domain: firstDomain,
+      da: 0, pa: 0, ss: 0, dr: 0, ur: 0, age: 0,
+      bl: '', rd: ''
+    };
+    // Try to parse columns
+    const nums = parts.slice(1).map(p => ({ raw: p, n: num(p), bl: /^[\d.]+[KkMmBb]$/.test(p) }));
+    // Pattern 1: domain, DA, PA, SS, Age, DR, UR, BL, RD (sama table order)
+    if (nums.length >= 5) {
+      row.da = nums[0]?.n ?? 0;
+      row.pa = nums[1]?.n ?? 0;
+      row.ss = nums[2]?.n ?? 0;
+      row.age = nums[3]?.n ?? 0;
+      row.dr = nums[4]?.n ?? 0;
+      if (nums[5]) row.ur = nums[5].n ?? 0;
+      if (nums[6]) row.bl = nums[6].raw || '';
+      if (nums[7]) row.rd = nums[7].raw || '';
+    } else if (nums.length === 1) {
+      row.da = nums[0]?.n ?? 0;
+    } else if (nums.length === 2) {
+      row.da = nums[0]?.n ?? 0; row.pa = nums[1]?.n ?? 0;
+    } else if (nums.length === 3) {
+      row.da = nums[0]?.n ?? 0; row.pa = nums[1]?.n ?? 0; row.dr = nums[2]?.n ?? 0;
+    } else if (nums.length === 4) {
+      row.da = nums[0]?.n ?? 0; row.pa = nums[1]?.n ?? 0; row.dr = nums[2]?.n ?? 0; row.age = nums[3]?.n ?? 0;
+    }
+    rows.push(row);
+  }
+  return rows;
+}
+
+function pasteParseText() {
+  const text = document.getElementById('pasteText').value;
+  const rows = pasteParseRows(text);
+  if (rows.length === 0) {
+    document.getElementById('pasteResult').innerHTML = '<div style="color:#fbbf24;">⚠️ Tidak ada domain valid terdeteksi. Cek format input.</div>';
+    return;
+  }
+  const rowsHtml = rows.map(r => `
+    <tr>
+      <td><input type="checkbox" class="paste-row" data-d='${JSON.stringify(r).replace(/'/g,"&#39;")}' checked></td>
+      <td>${r.domain}</td><td>${r.da}</td><td>${r.pa}</td><td>${r.ss}</td>
+      <td>${r.age}</td><td>${r.dr}</td><td>${r.ur}</td>
+      <td>${r.bl||'—'}</td><td>${r.rd||'—'}</td>
+    </tr>`).join('');
+  document.getElementById('pasteResult').innerHTML = `
+    <div style="background:rgba(16,185,129,0.1);padding:10px;border-radius:8px;margin-bottom:10px;">
+      ✅ <b>${rows.length} domain</b> terdeteksi.
+    </div>
+    <div style="max-height:300px;overflow:auto;background:var(--bg);padding:8px;border-radius:6px;">
+      <table style="width:100%;font-size:12px;">
+        <thead><tr><th><input type="checkbox" checked onchange="document.querySelectorAll('.paste-row').forEach(c=>c.checked=this.checked)"></th><th>Domain</th><th>DA</th><th>PA</th><th>SS</th><th>Age</th><th>DR</th><th>UR</th><th>BL</th><th>RD</th></tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    </div>
+    <button class="btn-success" onclick="pasteImportChecked()" style="margin-top:12px;font-weight:700;">✅ Import Selected</button>
+  `;
+}
+
+function pasteImportChecked() {
+  const checked = document.querySelectorAll('.paste-row:checked');
+  const rows = [...checked].map(cb => { try { return JSON.parse(cb.dataset.d.replace(/&#39;/g,"'")); } catch { return null; } }).filter(Boolean);
+  pasteDoImport(rows);
+}
+
+function pasteParseAndImport() {
+  const rows = pasteParseRows(document.getElementById('pasteText').value);
+  if (rows.length === 0) { toast('Tidak ada domain valid', 'warn'); return; }
+  pasteDoImport(rows);
+}
+
+function pasteDoImport(rows) {
+  const custom = JSON.parse(localStorage.getItem('dashboard_custom_domains') || '[]');
+  let added = 0, updated = 0;
+  rows.forEach(p => {
+    const dom = p.domain.toLowerCase().trim();
+    const newData = {
+      da: p.da||0, pa: p.pa||0, dr: p.dr||0, ur: p.ur||0,
+      ss: p.ss||0, bl: p.bl||'', rd: p.rd||'', age: p.age||0
+    };
+    const existingAll = allData.find(x => x.domain === dom);
+    const existingCustom = custom.findIndex(x => x.domain === dom);
+    if (existingAll || existingCustom >= 0) {
+      if (existingAll) Object.assign(existingAll, newData);
+      if (existingCustom >= 0) Object.assign(custom[existingCustom], newData);
+      saveMeta(dom, newData);
+      updated++;
+    } else {
+      const entry = { domain: dom, ...newData, nawala: '', notes: '', status: 'new', custom: true };
+      custom.push(entry); allData.push(entry);
+      added++;
+    }
+  });
+  localStorage.setItem('dashboard_custom_domains', JSON.stringify(custom));
+  if (typeof logActivity === 'function') logActivity('PASTE_IMPORT', `${added} added, ${updated} updated`);
+  closePasteImport();
+  applyFilters();
+  toast(`📋 Import: ${added} baru, ${updated} update`, 'success', 5000);
 }
 
 // ═══════════════════════════════════════════════════════════════
