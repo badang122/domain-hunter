@@ -1035,10 +1035,14 @@
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
           <div>
             <b style="color:#fbbf24;">🚀 1-Click Auto-Generate</b>
-            <span style="color:var(--muted);font-size:12px;margin-left:6px;">via 🇮🇩 <b>check.skiddle.id</b> — batch 30 domain/call (paling akurat sesuai Trust Positif aktual)</span>
+            <span style="color:var(--muted);font-size:12px;margin-left:6px;">via 🇮🇩 <b>check.skiddle.id</b> — batch 30 domain/call</span>
           </div>
-          <button class="btn-danger" onclick="autoGenerateAllNawala()" style="background:linear-gradient(135deg,#ef4444,#f59e0b);font-weight:700;">🚀 Auto-Gen Belum Dicek</button>
+          <div style="display:flex;gap:6px;">
+            <button onclick="debugSkiddle()" style="background:#6366f1;color:white;padding:6px 10px;border:0;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;">🐛 Debug</button>
+            <button class="btn-danger" onclick="autoGenerateAllNawala()" style="background:linear-gradient(135deg,#ef4444,#f59e0b);font-weight:700;">🚀 Auto-Gen Belum Dicek</button>
+          </div>
         </div>
+        <div id="nwDebugOut" style="margin-top:10px;font-size:12px;font-family:monospace;display:none;background:#000;color:#0f0;padding:10px;border-radius:6px;max-height:200px;overflow:auto;"></div>
       </div>
     </div>
 
@@ -2093,6 +2097,39 @@ async function checkNawalaViaSkiddle(domain) {
     console.warn('[Skiddle]', domain, 'error:', e.message || e);
     return null;
   }
+}
+
+// Debug function — test Skiddle API + show raw error in UI
+async function debugSkiddle() {
+  const out = document.getElementById('nwDebugOut');
+  out.style.display = 'block';
+  out.textContent = '🐛 Testing Skiddle API...\n\n';
+  const tests = ['google.com', 'pornhub.com', 'reddit.com'];
+  for (const d of tests) {
+    out.textContent += `Testing ${d}...\n`;
+    try {
+      const url = `https://check.skiddle.id/?domain=${encodeURIComponent(d)}&json=true`;
+      const res = await fetch(url, { method: 'GET', mode: 'cors' });
+      out.textContent += `  HTTP: ${res.status} ${res.statusText}\n`;
+      out.textContent += `  Headers: ${JSON.stringify(Object.fromEntries(res.headers.entries()))}\n`;
+      const text = await res.text();
+      out.textContent += `  Body: ${text.slice(0, 300)}\n\n`;
+    } catch (e) {
+      out.textContent += `  ❌ ERROR: ${e.message || e}\n`;
+      out.textContent += `  Type: ${e.name}\n`;
+      out.textContent += `  (Likely CORS, network, or DNS issue)\n\n`;
+    }
+  }
+  // Test backend API too
+  out.textContent += '--- Test backend /api/check-nawala ---\n';
+  try {
+    const res = await fetch('/api/check-nawala?domain=google.com');
+    out.textContent += `Backend HTTP: ${res.status}\n`;
+    out.textContent += `Body: ${(await res.text()).slice(0, 300)}\n`;
+  } catch (e) {
+    out.textContent += `Backend ERROR: ${e.message}\n`;
+  }
+  out.scrollTop = out.scrollHeight;
 }
 
 // Bulk batch via Skiddle (max 30 per call)
