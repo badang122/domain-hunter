@@ -827,6 +827,14 @@
     </label>
     <button class="btn-danger" onclick="clearAll()" style="margin-left:8px;">Clear All Data</button>
 
+    <h3 style="margin:20px 0 8px;">💀 Blocklist (Domain Hapus Permanen)</h3>
+    <p style="color:var(--muted);font-size:12px;">Domain yang di-hapus permanen masuk sini. Klik ⟲ untuk restore — domain bisa di-import/add lagi.</p>
+    <div style="display:flex;gap:8px;margin-bottom:8px;">
+      <button onclick="renderBlocklistUI()" class="btn-primary">🔄 Refresh List</button>
+      <button onclick="clearBlocklist()" class="btn-danger">🗑 Clear SEMUA Blocklist</button>
+    </div>
+    <div id="blocklistUI" style="max-height:280px;overflow-y:auto;background:var(--bg);padding:8px;border-radius:8px;border:1px solid var(--border);"></div>
+
     <h3 style="margin:20px 0 8px;">Import Domains (CSV)</h3>
     <label class="btn-success" style="display:inline-block;padding:8px 12px;border-radius:6px;cursor:pointer;color:white;">
       Import CSV <input type="file" accept=".csv,.txt" onchange="importCSV(event)" style="display:none;">
@@ -3242,6 +3250,47 @@ function clearAll() {
 function openSettings() {
   document.getElementById('settingsModal').classList.add('active');
   renderColToggles();
+  renderBlocklistUI();
+}
+
+// Blocklist manager — view + restore permanent-deleted domains
+function renderBlocklistUI() {
+  const ui = document.getElementById('blocklistUI');
+  if (!ui) return;
+  const blocked = JSON.parse(localStorage.getItem('dashboard_blocked_domains') || '[]');
+  const deleted = JSON.parse(localStorage.getItem('dashboard_deleted_domains') || '[]');
+  const combined = [...new Set([...blocked, ...deleted])];
+  if (combined.length === 0) {
+    ui.innerHTML = '<div style="text-align:center;color:var(--muted);padding:20px;">✨ Blocklist kosong — tidak ada domain yg di-hapus permanen.</div>';
+    return;
+  }
+  ui.innerHTML = `
+    <div style="margin-bottom:8px;color:var(--muted);font-size:11px;">Total: <b>${combined.length}</b> domain di blocklist</div>
+    ${combined.map(d => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-bottom:1px solid var(--border);">
+        <span style="font-family:monospace;font-size:12px;color:#f87171;">💀 ${d}</span>
+        <button onclick="restoreFromBlocklist('${d}')" class="btn-success" style="padding:4px 10px;font-size:11px;">⟲ Restore</button>
+      </div>
+    `).join('')}
+  `;
+}
+
+function restoreFromBlocklist(domain) {
+  const blocked = JSON.parse(localStorage.getItem('dashboard_blocked_domains') || '[]');
+  const deleted = JSON.parse(localStorage.getItem('dashboard_deleted_domains') || '[]');
+  localStorage.setItem('dashboard_blocked_domains', JSON.stringify(blocked.filter(d => d !== domain)));
+  localStorage.setItem('dashboard_deleted_domains', JSON.stringify(deleted.filter(d => d !== domain)));
+  toast(`⟲ ${domain} di-restore — bisa ditambahkan lagi`, 'success', 3500);
+  if (typeof logActivity === 'function') logActivity('RESTORE_BLOCKED', domain);
+  renderBlocklistUI();
+}
+
+function clearBlocklist() {
+  if (!confirm('Clear SEMUA blocklist? Domain-domain di blocklist bisa di-add lagi nanti.')) return;
+  localStorage.setItem('dashboard_blocked_domains', '[]');
+  localStorage.setItem('dashboard_deleted_domains', '[]');
+  toast('🗑 Blocklist cleared — semua domain bisa di-add lagi', 'success', 3500);
+  renderBlocklistUI();
 }
 function closeSettings() { document.getElementById('settingsModal').classList.remove('active'); }
 
