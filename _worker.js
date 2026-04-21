@@ -23,7 +23,22 @@ function jsonResp(obj, status = 200) {
   });
 }
 
-async function checkNawala(domain) {
+// Primary: Skiddle API (proven works, server-side cek vs Trust Positif list)
+async function checkViaSkiddle(domain) {
+  try {
+    const res = await fetch(`https://check.skiddle.id/?domain=${encodeURIComponent(domain)}&json=true`, {
+      cf: { cacheTtl: 300, cacheEverything: true }
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const r = data[domain];
+    if (!r || typeof r.blocked !== 'boolean') return null;
+    return { status: r.blocked ? 'blocked' : 'safe', source: 'skiddle' };
+  } catch (e) { return null; }
+}
+
+// Fallback: direct Trust Positif scrape (sering geo-block dari edge non-Indonesia)
+async function checkViaTrustPositif(domain) {
   const tpUrl = `https://trustpositif.komdigi.go.id/?trpdomain=${encodeURIComponent(domain)}`;
   try {
     const res = await fetch(tpUrl, {
@@ -35,25 +50,30 @@ async function checkNawala(domain) {
       },
       redirect: 'follow'
     });
-    if (!res.ok) return { status: 'error', httpStatus: res.status };
+    if (!res.ok) return null;
     const html = await res.text();
     const lower = html.toLowerCase();
     const domainLow = domain.toLowerCase();
-
     for (const kw of BLOCK_KEYWORDS) {
-      if (lower.includes(kw)) {
-        if (lower.includes(domainLow) || lower.indexOf(kw) < 5000) {
-          return { status: 'blocked', matched: kw };
-        }
+      if (lower.includes(kw) && (lower.includes(domainLow) || lower.indexOf(kw) < 5000)) {
+        return { status: 'blocked', source: 'tp', matched: kw };
       }
     }
     for (const kw of SAFE_KEYWORDS) {
-      if (lower.includes(kw)) return { status: 'safe', matched: kw };
+      if (lower.includes(kw)) return { status: 'safe', source: 'tp', matched: kw };
     }
-    return { status: 'unknown', htmlLength: html.length };
-  } catch (e) {
-    return { status: 'error', error: String(e) };
-  }
+    return null;
+  } catch (e) { return null; }
+}
+
+async function checkNawala(domain) {
+  // Try Skiddle first (most reliable from CF edge)
+  const skid = await checkViaSkiddle(domain);
+  if (skid) return skid;
+  // Fallback to direct Trust Positif
+  const tp = await checkViaTrustPositif(domain);
+  if (tp) return tp;
+  return { status: 'unknown', error: 'all methods failed' };
 }
 
 export default {
