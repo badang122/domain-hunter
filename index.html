@@ -1812,7 +1812,13 @@ function render() {
       domain: (() => {
         const meta = JSON.parse(localStorage.getItem('dashboard_meta') || '{}')[d.domain] || {};
         const pin = meta.pinned ? '<span class="pin-badge" title="Pinned">📌</span>' : '';
-        const rating = meta.rating > 0 ? `<span style="color:#fbbf24;font-size:11px;margin-right:4px;" title="Rating ${meta.rating}/5">${'★'.repeat(meta.rating)}</span>` : '';
+        const curR = meta.rating || 0;
+        // Inline clickable 5-star rating
+        const ratingStars = `<span class="inline-rating" data-domain="${d.domain}" style="display:inline-flex;gap:1px;margin-right:6px;vertical-align:middle;cursor:pointer;">${
+          [1,2,3,4,5].map(n =>
+            `<span onclick="setDomainRating('${d.domain}', ${n === curR ? 0 : n});event.stopPropagation();" title="Rating ${n}/5 (klik lagi untuk reset)" style="color:${n <= curR ? '#fbbf24' : '#475569'};font-size:14px;transition:color 0.15s;">★</span>`
+          ).join('')
+        }</span>`;
         const tags = (meta.tags || '').split(',').map(t=>t.trim()).filter(Boolean);
         const tagChips = tags.slice(0,2).map(t=>`<span class="tag-chip" title="Tag: ${t}">${t}</span>`).join('');
         // Expiry warning
@@ -1823,7 +1829,7 @@ function render() {
           else if (days <= 30) expBadge = `<span class="expiry-soon" title="Expired dalam ${days} hari">⏰ ${days}d</span>`;
           else if (days <= 90) expBadge = `<span class="expiry-warn" title="Expired dalam ${days} hari">⏰ ${days}d</span>`;
         }
-        return `<td>${pin}${rating}<button class="fav-star ${isFav(d.domain)?'active':''}" onclick="toggleFav('${d.domain}')" title="Toggle favorite">${isFav(d.domain)?'⭐':'☆'}</button> <span class="domain" contenteditable="false">${d.domain}</span> ${tagChips}${expBadge}</td>`;
+        return `<td>${pin}${ratingStars}<button class="fav-star ${isFav(d.domain)?'active':''}" onclick="toggleFav('${d.domain}')" title="Toggle favorite">${isFav(d.domain)?'⭐':'☆'}</button> <span class="domain" contenteditable="false">${d.domain}</span> ${tagChips}${expBadge}</td>`;
       })(),
       score: `<td><span class="score ${scoreColor(score)}">${score}</span></td>`,
       status: `<td>${renderStatus(d)}</td>`,
@@ -5006,6 +5012,14 @@ function changeMusicStation(idx) {
 let currentPropDomain = '';
 let activeTagFilter = '';
 let activeExpiryFilter = false;
+
+// Inline rating dari row table — langsung save ke meta
+function setDomainRating(domain, rating) {
+  saveMeta(domain, { rating: rating });
+  if (typeof toast === 'function') toast(rating === 0 ? `Rating ${domain} di-reset` : `⭐ ${domain} rated ${rating}/5`, 'success', 2000);
+  if (typeof logActivity === 'function') logActivity('RATING', `${domain} → ${rating}`);
+  render();
+}
 
 let currentPropRating = 0;
 function setPropRating(r) {
