@@ -1760,6 +1760,7 @@ mydomain.net"></textarea>
         <th data-sort="ur" data-col="ur">UR</th>
         <th data-sort="bl" data-col="bl">BL</th>
         <th data-sort="rd" data-col="rd">RD</th>
+        <th data-col="goodbl">GoodBL</th>
         <th data-sort="nawala" data-col="nawala">Nawala</th>
         <th data-col="notes">Notes</th>
         <th data-col="check">Check</th>
@@ -1875,14 +1876,13 @@ let sortKey = 'score';
 let sortDir = 'desc';
 let sortKeys = []; // for multi-sort
 
-const COLS = ['sel','domain','score','status','da','pa','ss','age','dr','ur','bl','rd','nawala','notes','check'];
-const COL_NAMES = { sel:'Select', domain:'Domain', score:'Score', status:'Status', da:'DA', pa:'PA', ss:'SS', dr:'DR', ur:'UR', bl:'BL', rd:'RD', age:'Age', nawala:'Nawala', notes:'Notes', check:'Actions' };
+const COLS = ['sel','domain','score','status','da','pa','ss','age','dr','ur','bl','rd','goodbl','nawala','notes','check'];
+const COL_NAMES = { sel:'Select', domain:'Domain', score:'Score', status:'Status', da:'DA', pa:'PA', ss:'SS', dr:'DR', ur:'UR', bl:'BL', rd:'RD', goodbl:'GoodBL', age:'Age', nawala:'Nawala', notes:'Notes', check:'Actions' };
 // Force reset visibleCols kalau tidak punya UR/RD (migration)
 let visibleCols = JSON.parse(localStorage.getItem('dashboard_visible_cols') || 'null');
-// Check order match: DA, PA, SS, AGE, DR, UR, BL, RD (age sekarang setelah SS)
 const ageIdx = visibleCols?.indexOf('age');
 const drIdx = visibleCols?.indexOf('dr');
-if (!visibleCols || !visibleCols.includes('ur') || !visibleCols.includes('rd') || (ageIdx > drIdx)) {
+if (!visibleCols || !visibleCols.includes('ur') || !visibleCols.includes('rd') || !visibleCols.includes('goodbl') || (ageIdx > drIdx)) {
   visibleCols = [...COLS];
   localStorage.setItem('dashboard_visible_cols', JSON.stringify(visibleCols));
 }
@@ -1990,6 +1990,15 @@ function render() {
           display = rdVal.length > 30 ? rdVal.slice(0, 30) + '…' : rdVal;
         }
         return `<td class="${colorClass}" data-field="rd" data-domain="${d.domain}" title="${rdVal.replace(/"/g,'&quot;')}${rdCount ? ' (nilai: '+formatID(rdCount)+')' : ''} · Klik untuk ${hasList?'edit':'tambah'} list referring domains" style="max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer;" onclick="editRD('${d.domain}')">${display}</td>`;
+      })(),
+      goodbl: (() => {
+        const meta = JSON.parse(localStorage.getItem('dashboard_meta') || '{}')[d.domain] || {};
+        const gbl = d.goodbl || meta.goodbl || '';
+        if (!gbl) return `<td data-field="goodbl" data-domain="${d.domain}" style="cursor:pointer;color:var(--muted);" onclick="editGoodBL('${d.domain}')">📝 Add</td>`;
+        const items = gbl.split(',').map(s=>s.trim()).filter(Boolean);
+        const preview = items.slice(0,2).join(', ');
+        const extra = items.length > 2 ? ` <b style="color:#60a5fa;font-size:11px;">(+${items.length-2})</b>` : '';
+        return `<td data-field="goodbl" data-domain="${d.domain}" title="${gbl.replace(/"/g,'&quot;')}" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;" onclick="editGoodBL('${d.domain}')"><b style="color:#34d399;">${items.length}</b> · ${preview}${extra}</td>`;
       })(),
       age: `<td contenteditable="true" data-field="age" data-domain="${d.domain}">${(d.age === '—' || d.age === '-') ? '—' : (d.age || '—')}</td>`,
       nawala: `<td>${d.nawala === 'blocked' ? '<span class="bad">🔴 Blokir</span>' : d.nawala === 'safe' ? '<span class="good">🟢 Aman</span>' : '<span class="empty">—</span>'} <button class="check-link" style="background:#dc2626;color:white;padding:2px 6px;" onclick="autoCheckNawala('${d.domain}')" title="Cek Nawala otomatis">🔄</button></td>`,
@@ -2869,12 +2878,8 @@ async function addDomain(withAutoCheck = false) {
     dr: parseInt(document.getElementById('newDR').value) || 0,
     ur: parseInt(document.getElementById('newUR')?.value) || 0,
     bl: document.getElementById('newBL').value.trim() || '',
-    rd: (() => {
-      const full = (document.getElementById('newRDfull')?.value || '').trim();
-      const inline = (document.getElementById('newRD')?.value || '').trim();
-      // Prioritas: textarea > inline (kalau keduanya diisi)
-      return full || inline;
-    })(),
+    rd: (document.getElementById('newRD')?.value || '').trim(),
+    goodbl: (document.getElementById('newRDfull')?.value || '').trim(),
     age: (() => {
       const v = document.getElementById('newAge').value.trim();
       if (!v || v === '-' || v === '—' || v === 'tidak tahu') return '—'; // unknown
@@ -5815,6 +5820,45 @@ async function parseBulkImport(file) {
   reader.readAsArrayBuffer(file);
 }
 
+// Edit GoodBL list per-domain via modal
+function editGoodBL(domain) {
+  const d = allData.find(x => x.domain === domain);
+  if (!d) return;
+  const current = d.goodbl || '';
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(6px);z-index:99999;display:flex;align-items:center;justify-content:center;';
+  modal.innerHTML = `
+    <div style="background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:24px;max-width:600px;width:92%;box-shadow:var(--shadow-lg);">
+      <h2 style="margin-bottom:10px;">🔗 Good Backlinks — ${domain}</h2>
+      <p style="color:var(--muted);font-size:13px;margin-bottom:10px;">Daftar backlink berkualitas (pisahkan koma atau newline):</p>
+      <textarea id="goodblEdit" rows="8" style="width:100%;font-family:monospace;font-size:13px;" placeholder="gravatar.com, issuu.com, huffpost.com, twitch.tv, hatena.ne.jp...">${current}</textarea>
+      <div style="color:var(--muted);font-size:11px;margin-top:6px;">Total: <span id="gblCount">${current.split(',').filter(Boolean).length}</span> backlink</div>
+      <div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end;">
+        <button onclick="this.closest('[style*=backdrop]').remove()">Cancel</button>
+        <button class="btn-danger" onclick="document.getElementById('goodblEdit').value=''">🗑 Clear</button>
+        <button class="btn-primary" onclick="saveGoodBL('${domain}')">💾 Save</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  const ta = document.getElementById('goodblEdit');
+  ta.focus();
+  ta.addEventListener('input', () => {
+    document.getElementById('gblCount').textContent = ta.value.split(/[,\n]/).filter(s => s.trim()).length;
+  });
+}
+function saveGoodBL(domain) {
+  const val = document.getElementById('goodblEdit').value.trim();
+  const d = allData.find(x => x.domain === domain);
+  if (d) d.goodbl = val;
+  const custom = JSON.parse(localStorage.getItem('dashboard_custom_domains') || '[]');
+  const ci = custom.findIndex(x => x.domain === domain);
+  if (ci >= 0) { custom[ci].goodbl = val; localStorage.setItem('dashboard_custom_domains', JSON.stringify(custom)); }
+  saveMeta(domain, { goodbl: val });
+  document.querySelector('[style*=backdrop]')?.remove();
+  toast(`🔗 Good Backlink ${domain} tersimpan`, 'success', 2500);
+  render();
+}
+
 // Helper: paste clipboard ke RD textarea (Add Domain form)
 async function pasteToRDTextarea() {
   try {
@@ -6037,11 +6081,10 @@ function pasteDoImport(rows) {
     const newData = {
       da: p.da||0, pa: p.pa||0, dr: p.dr||0, ur: p.ur||0,
       ss: p.ss||0, bl: p.bl||'',
-      rd: p.rd || '',  // RD = angka count (dari kolom terakhir paste)
-      age: p.age||0
+      rd: p.rd || '',
+      age: p.age||0,
+      goodbl: globalGoodBL || p.goodbl || ''
     };
-    // Good Backlink list ke notes (kalau diisi)
-    if (globalGoodBL) newData.notes = '🔗 Good Backlinks: ' + globalGoodBL;
     // Preserve existing meta saat update (jangan overwrite)
     // Kalau domain di deleted list, hapus dari deleted (restore)
     const delIdx = deleted.indexOf(dom);
