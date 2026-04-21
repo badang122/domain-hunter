@@ -5881,21 +5881,23 @@ function pasteParseRows(text) {
       return isNaN(n) ? 0 : n;
     };
     const cols = parts.slice(1);
-    // Pattern: domain, DA, PA, SS, Age, DR, UR, BL, RD, [Ref Domains List...]
+    // Pattern: domain, DA, PA, SS, Age, DR, UR, BL, RD (count), [Ref Domains List...]
     if (cols.length >= 5) {
       row.da = Math.round(parseN(cols[0]));
       row.pa = Math.round(parseN(cols[1]));
       row.ss = Math.round(parseN(cols[2]));
       row.age = Math.round(parseN(cols[3]));
       row.dr = Math.round(parseN(cols[4]));
-      if (cols[5] !== undefined) row.ur = parseN(cols[5]); // UR bisa desimal (4.9)
+      if (cols[5] !== undefined) row.ur = parseN(cols[5]);
       if (cols[6] !== undefined) row.bl = String(cols[6]).trim();
       const rdCount = cols[7] !== undefined ? String(cols[7]).trim() : '';
-      // Kolom 9+ (kalau ada) = referring domains LIST (bisa multi-kolom kalau pakai space split)
+      // Kolom 9+ = ref domains list (optional, save ke notes biar tidak gantiin rd count)
       const refListCols = cols.slice(8).filter(Boolean);
       const refList = refListCols.length > 0 ? refListCols.join(' ').trim() : '';
-      // Priority: list > count (sesuai logic existing)
-      row.rd = refList || rdCount;
+      // RD field = angka count (bukan list). Kalau list diberikan tanpa count, pakai list.
+      row.rd = rdCount || refList;
+      // Ref list disimpan sebagai note (opsional, biar ga hilang)
+      if (refList && rdCount) row.notes = (row.notes || '') + '🔗 Ref domains: ' + refList;
     } else if (cols.length === 1) {
       row.da = Math.round(parseN(cols[0]));
     } else if (cols.length === 2) {
@@ -6300,7 +6302,7 @@ Mulai extract:`;
           da: parseInt(p.da)||0, pa: parseInt(p.pa)||0,
           dr: parseInt(p.dr)||0, ur: parseInt(p.ur)||0,
           ss: parseInt(p.ss)||0, bl: p.bl||'',
-          rd: refList || rdCount,
+          rd: rdCount || refList,  // PRIORITY: count (angka) dulu
           age: parseInt(p.age)||0
         };
         // Un-delete kalau domain di deleted list
@@ -6383,18 +6385,18 @@ function ssImport() {
       if (allData.find(x => x.domain === dom) || custom.find(x => x.domain === dom)) {
         skipped++; return;
       }
-      // Priority RD: kalau refDomains (list) ada, pakai itu sebagai rd (sesuai logic RD inline+textarea)
+      // RD = angka count (rating domain), bukan list
       const refList = (p.refDomains || '').trim();
       const rdCount = (p.rd || '').trim();
-      const rdValue = refList || rdCount; // list > count
       const entry = {
         domain: dom,
         da: parseInt(p.da)||0, pa: parseInt(p.pa)||0,
         dr: parseInt(p.dr)||0, ur: parseInt(p.ur)||0,
         ss: parseInt(p.ss)||0, bl: p.bl||'',
-        rd: rdValue,
+        rd: rdCount || refList,  // PRIORITY count dulu
         age: parseInt(p.age)||0,
-        nawala: '', notes: '', status: 'new', custom: true
+        nawala: '', notes: refList && rdCount ? '🔗 Ref: ' + refList : '',
+        status: 'new', custom: true
       };
       custom.push(entry); allData.push(entry); added++;
     } catch (e) {}
