@@ -1270,7 +1270,24 @@ example.com
 another.org
 mydomain.net"></textarea>
 
-    <div style="font-size:11px;color:var(--muted);margin-top:6px;">💡 Format per row: <code>domain.com  DA PA SS Age DR UR BL <b style="color:#67e8f9;">RD</b>  <b style="color:#34d399;">goodBL1, goodBL2, goodBL3...</b></code><br>Contoh: <code>nlcfpc.org  29 35 28 1 32 4.9 4,397 <b style="color:#67e8f9;">538</b>  <b style="color:#34d399;">gravatar.com, issuu.com, huffpost.com</b></code> → <b style="color:#67e8f9;">538</b> = RD, <b style="color:#34d399;">gravatar.com,...</b> = GoodBL</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:6px;">💡 Format per row: <code>domain.com  DA PA SS Age DR UR BL <b style="color:#67e8f9;">RD</b>  <b style="color:#34d399;">goodBL1, goodBL2...</b></code> (kolom 9+ jadi GoodBL per-row)</div>
+
+    <!-- Global Good Backlink textarea — apply ke SEMUA domain kalau diisi -->
+    <div style="margin-top:10px;padding:10px;background:rgba(52,211,153,0.08);border:1px solid rgba(52,211,153,0.3);border-radius:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:6px;">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#34d399;">
+          <span style="background:#34d399;color:#1f2937;padding:2px 8px;border-radius:6px;font-size:11px;">GoodBL</span>
+          🔗 Good Backlink (apply ke SEMUA domain yg di-import):
+        </label>
+        <div style="display:flex;gap:4px;">
+          <button type="button" onclick="pasteToGoodBLImport()" style="background:#6366f1;color:white;border:0;padding:3px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;">📋 Paste clipboard</button>
+          <button type="button" onclick="document.getElementById('pasteGoodBL').value=''" style="background:#374151;color:white;border:0;padding:3px 10px;border-radius:6px;cursor:pointer;font-size:11px;">Clear</button>
+        </div>
+      </div>
+      <textarea id="pasteGoodBL" rows="2" style="width:100%;font-family:monospace;font-size:13px;resize:vertical;"
+                placeholder="gravatar.com, adobe.com, behance.net, issuu.com, twitch.tv — kalau diisi, semua domain yg di-import akan punya GoodBL ini"></textarea>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px;">💡 Kosongkan kalau tiap domain punya GoodBL berbeda (pakai per-row di text paste).</div>
+    </div>
 
     <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
       <button onclick="pasteFromClipboard()" style="background:#6366f1;color:white;padding:8px 14px;border:0;border-radius:8px;cursor:pointer;font-weight:700;">📋 Baca Clipboard &amp; Auto-Import</button>
@@ -6118,8 +6135,20 @@ function pasteParseAndImport() {
   pasteDoImport(rows);
 }
 
+// Paste Good Backlink textarea helper
+async function pasteToGoodBLImport() {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (!text) { toast('Clipboard kosong', 'warn'); return; }
+    document.getElementById('pasteGoodBL').value = text;
+    const count = text.split(/[,\n]/).map(s=>s.trim()).filter(Boolean).length;
+    toast(`📋 Pasted GoodBL (${count} item)`, 'success', 2500);
+  } catch (e) { toast('Gagal paste: ' + e.message, 'error'); }
+}
+
 function pasteDoImport(rows) {
   if (!rows || rows.length === 0) { toast('Tidak ada domain valid untuk diimport', 'warn'); return; }
+  const globalGoodBL = (document.getElementById('pasteGoodBL')?.value || '').trim();
   const custom = JSON.parse(localStorage.getItem('dashboard_custom_domains') || '[]');
   const deleted = JSON.parse(localStorage.getItem('dashboard_deleted_domains') || '[]');
   const meta = JSON.parse(localStorage.getItem('dashboard_meta') || '{}');
@@ -6132,7 +6161,7 @@ function pasteDoImport(rows) {
       ss: p.ss||0, bl: p.bl||'',
       rd: p.rd || '',
       age: p.age||0,
-      goodbl: p.goodbl || ''
+      goodbl: p.goodbl || globalGoodBL || ''  // per-row > global
     };
     // Preserve existing meta saat update (jangan overwrite)
     // Kalau domain di deleted list, hapus dari deleted (restore)
