@@ -2179,8 +2179,7 @@ function render() {
           const extra = items.length > 2 ? ` <b style="color:#60a5fa;font-size:11px;">(${items.length})</b>` : '';
           display = `<b>${formatID(items.length)}</b> · ${preview}${extra}`;
         } else if (/^[\d.,]+$/.test(rdVal.trim())) {
-          // Angka (preserve separator kalau ada di paste)
-          display = `<b>${rdVal.trim()}</b> <span style="color:#60a5fa;font-size:11px;" title="Klik untuk tambah list ref domain">✎ list</span>`;
+          display = `<b>${rdVal.trim()}</b>`;
         } else {
           display = rdVal.length > 30 ? rdVal.slice(0, 30) + '…' : rdVal;
         }
