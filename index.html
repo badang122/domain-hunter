@@ -6422,9 +6422,16 @@ function pasteDoImport(rows) {
   localStorage.setItem('dashboard_deleted_domains', JSON.stringify(deleted));
   localStorage.setItem('dashboard_custom_domains', JSON.stringify(custom));
   if (typeof logActivity === 'function') logActivity('PASTE_IMPORT', `${added} added, ${updated} updated, ${restored} restored`);
-  // Verify localStorage actually saved
   const saved = JSON.parse(localStorage.getItem('dashboard_custom_domains') || '[]');
   console.log('[PasteImport] Permanent save verified:', { added, updated, restored, addedDomains, totalNow: allData.length, localStorageCount: saved.length });
+  // Auto-sort by Expired date kalau ada tanggal di import
+  const hasDate = rows.some(r => r.expiryDate);
+  if (hasDate) {
+    sortKey = 'expired';
+    sortDir = 'asc';
+    sortKeys = [];
+    toast('🗓️ Auto-sort by Expired date (earliest first)', 'info', 2500);
+  }
   closePasteImport();
   const prevCount = filteredData.length;
   applyFilters();
