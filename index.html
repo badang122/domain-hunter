@@ -6308,9 +6308,24 @@ async function pasteFromClipboard() {
 
 function pasteParseText() {
   const text = document.getElementById('pasteText').value;
+  if (!text.trim()) {
+    document.getElementById('pasteResult').innerHTML = '<div style="color:#fbbf24;">⚠️ Textarea kosong — paste dulu.</div>';
+    return;
+  }
   const rows = pasteParseRows(text);
   if (rows.length === 0) {
-    document.getElementById('pasteResult').innerHTML = '<div style="color:#fbbf24;">⚠️ Tidak ada domain valid terdeteksi. Cek format input.</div>';
+    // Show first 10 lines of input for debug
+    const preview = text.split('\n').slice(0, 10).map(l => l.slice(0, 150)).join('\n');
+    document.getElementById('pasteResult').innerHTML = `
+      <div style="color:#ef4444;background:rgba(239,68,68,0.1);padding:10px;border-radius:8px;border:1px solid rgba(239,68,68,0.3);">
+        ⚠️ <b>Tidak ada domain valid terdeteksi</b>. Kemungkinan:<br>
+        • Domain tidak valid format (butuh <code>nama.tld</code> seperti <code>example.com</code>)<br>
+        • Line header/tanggal tidak ada domain<br>
+        • Format tidak ter-detect (coba pakai tab atau space sebagai separator)<br>
+        <br>Preview 10 baris pertama:
+        <pre style="background:#000;padding:8px;border-radius:4px;font-size:11px;max-height:200px;overflow:auto;margin-top:6px;">${preview.replace(/</g,'&lt;')}</pre>
+        <br>Debug via Console (F12): <code>pasteParseRows(document.getElementById('pasteText').value)</code>
+      </div>`;
     return;
   }
   const rowsHtml = rows.map(r => `
