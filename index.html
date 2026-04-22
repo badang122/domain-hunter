@@ -2153,7 +2153,7 @@ function render() {
       pa: `<td class="${getColor(d.pa, 35, 20)}" contenteditable="true" data-field="pa" data-domain="${d.domain}">${d.pa || '—'}</td>`,
       ss: `<td class="${d.ss > 50 ? 'bad' : d.ss > 30 ? 'mid' : 'good'}" contenteditable="true" data-field="ss" data-domain="${d.domain}">${d.ss || '—'}${d.ss ? '%' : ''}</td>`,
       dr: `<td class="${getColor(d.dr, 30, 15)}" contenteditable="true" data-field="dr" data-domain="${d.domain}">${d.dr || '—'}</td>`,
-      ur: `<td class="${getColor(d.ur, 30, 15)}" contenteditable="true" data-field="ur" data-domain="${d.domain}">${d.ur || '—'}</td>`,
+      ur: `<td class="${getColor(parseFloat(String(d.ur||'').replace(/[.,]/g,''))||0, 30, 15)}" contenteditable="true" data-field="ur" data-domain="${d.domain}">${d.ur || '—'}</td>`,
       bl: `<td contenteditable="true" data-field="bl" data-domain="${d.domain}">${formatBL(d.bl)}</td>`,
       rd: (() => {
         const rdVal = d.rd || '';
@@ -6282,7 +6282,7 @@ function pasteParseRows(text) {
       row.ss = Math.round(parseN(cols[2]));
       row.age = Math.round(parseN(cols[3]));
       row.dr = Math.round(parseN(cols[4]));
-      if (cols[5] !== undefined) row.ur = parseN(cols[5]);
+      if (cols[5] !== undefined) row.ur = String(cols[5]).trim(); // preserve format (4.9 / 1.234 / 46)
       if (cols[6] !== undefined) row.bl = String(cols[6]).trim();
       // RD = angka di kolom 8. Kalau kolom 8 bukan numeric (misal langsung domain name),
       // artinya user tidak kasih RD count → skip RD, shift semua ke GoodBL
