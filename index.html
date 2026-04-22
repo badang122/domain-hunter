@@ -1908,7 +1908,39 @@ function loadCustomDomainsWithRecovery() {
     return backup;
   }
 }
-// Wrap localStorage.setItem untuk dashboard_custom_domains (mirror ke backup)
+// Wrap localStorage.setItem + mirror ke IndexedDB (lebih tahan dari localStorage)
+let _idb = null;
+function _openIDB() {
+  return new Promise(r => {
+    try {
+      const req = indexedDB.open('DomainHunter', 1);
+      req.onupgradeneeded = e => { const db = e.target.result; if (!db.objectStoreNames.contains('data')) db.createObjectStore('data'); };
+      req.onsuccess = e => r(e.target.result);
+      req.onerror = () => r(null);
+    } catch { r(null); }
+  });
+}
+async function _idbSet(k, v) {
+  if (!_idb) _idb = await _openIDB();
+  if (!_idb) return;
+  try {
+    const tx = _idb.transaction('data', 'readwrite');
+    tx.objectStore('data').put(v, k);
+  } catch {}
+}
+async function _idbGet(k) {
+  if (!_idb) _idb = await _openIDB();
+  if (!_idb) return null;
+  return new Promise(r => {
+    try {
+      const tx = _idb.transaction('data', 'readonly');
+      const req = tx.objectStore('data').get(k);
+      req.onsuccess = () => r(req.result || null);
+      req.onerror = () => r(null);
+    } catch { r(null); }
+  });
+}
+
 const _origSetItem = localStorage.setItem.bind(localStorage);
 localStorage.setItem = function(key, val) {
   _origSetItem(key, val);
@@ -1918,13 +1950,36 @@ localStorage.setItem = function(key, val) {
       if (Array.isArray(data) && data.length > 0) {
         _origSetItem('dashboard_custom_domains_backup', val);
         _origSetItem('dashboard_custom_domains_timestamp', Date.now().toString());
+        _idbSet('custom_domains', data); // mirror ke IndexedDB
       } else {
-        // Prevent empty save dari overwrite backup
         console.warn('[Persist] Attempted empty save to custom_domains — skip backup');
       }
     } catch {}
   }
+  if (key === 'dashboard_meta') {
+    try { _idbSet('meta', JSON.parse(val)); } catch {}
+  }
+  if (key === 'dashboard_deleted_domains') {
+    try { _idbSet('deleted', JSON.parse(val)); } catch {}
+  }
 };
+
+// Auto-recover dari IndexedDB kalau localStorage empty setelah page load
+setTimeout(async () => {
+  const lsCount = JSON.parse(localStorage.getItem('dashboard_custom_domains') || '[]').length;
+  if (lsCount > 0) return; // localStorage OK, no recovery needed
+  const idbData = await _idbGet('custom_domains');
+  if (!idbData || !Array.isArray(idbData) || idbData.length === 0) return;
+  console.warn('[IDB Recovery] localStorage kosong, restore', idbData.length, 'domain dari IndexedDB');
+  _origSetItem('dashboard_custom_domains', JSON.stringify(idbData));
+  _origSetItem('dashboard_custom_domains_backup', JSON.stringify(idbData));
+  const meta = await _idbGet('meta');
+  if (meta) _origSetItem('dashboard_meta', JSON.stringify(meta));
+  setTimeout(() => {
+    if (typeof toast === 'function') toast(`♻️ Auto-restore ${idbData.length} domain dari IndexedDB backup. Reloading...`, 'success', 3000);
+    setTimeout(() => location.reload(), 2500);
+  }, 500);
+}, 1500);
 
 let allData = parseCSV(rawData);
 const customDomains = loadCustomDomainsWithRecovery();
