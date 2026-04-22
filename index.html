@@ -1877,9 +1877,10 @@ function formatID(n) {
 function formatBL(bl) {
   if (!bl) return '—';
   const s = String(bl).trim();
-  // Jika sudah ada K/M/B suffix, biarkan
+  // Kalau sudah ada separator (titik atau koma) atau K/M/B suffix → biarkan (preserve pasted format)
   if (/[KMBkmb]/i.test(s)) return s;
-  // Jika angka murni, format dengan titik
+  if (/[.,]/.test(s)) return s; // sudah punya separator, jangan reformat
+  // Angka murni tanpa separator → format dengan titik (ID default)
   if (/^\d+$/.test(s)) return formatID(s);
   return s;
 }
@@ -2156,28 +2157,30 @@ function render() {
       bl: `<td contenteditable="true" data-field="bl" data-domain="${d.domain}">${formatBL(d.bl)}</td>`,
       rd: (() => {
         const rdVal = d.rd || '';
-        const hasComma = rdVal.includes(',') && !/^\d[\d,.]*$/.test(rdVal);
+        // Deteksi list ref domain: comma diikuti spasi/letter (bukan number)
+        const hasList = /,\s*[a-z]/i.test(rdVal);
         let rdCount = 0;
-        if (hasComma) {
+        if (hasList) {
           rdCount = rdVal.split(',').map(s => s.trim()).filter(Boolean).length;
-        } else if (/^\d+$/.test(rdVal.trim())) {
-          rdCount = parseInt(rdVal) || 0;
+        } else if (/^[\d.,]+$/.test(rdVal.trim())) {
+          // Angka dengan atau tanpa separator (3.600, 3,600, 3600)
+          rdCount = parseInt(rdVal.replace(/[.,]/g,'')) || 0;
         } else if (rdVal) {
           rdCount = parseBL(rdVal);
         }
         const colorClass = rdCount >= 100 ? 'good' : rdCount >= 30 ? 'mid' : rdCount > 0 ? 'bad' : 'empty';
 
-        let display, hasList = hasComma;
+        let display;
         if (!rdVal) {
           display = `<span style="color:var(--muted);">📝 Add list</span>`;
-        } else if (hasComma) {
+        } else if (hasList) {
           const items = rdVal.split(',').map(s => s.trim()).filter(Boolean);
           const preview = items.slice(0, 2).join(', ');
           const extra = items.length > 2 ? ` <b style="color:#60a5fa;font-size:11px;">(${items.length})</b>` : '';
           display = `<b>${formatID(items.length)}</b> · ${preview}${extra}`;
-        } else if (/^\d+$/.test(rdVal.trim())) {
-          // Numeric only - kasih link tambah list
-          display = `<b>${formatID(rdVal)}</b> <span style="color:#60a5fa;font-size:11px;" title="Klik untuk tambah list ref domain">✎ list</span>`;
+        } else if (/^[\d.,]+$/.test(rdVal.trim())) {
+          // Angka (preserve separator kalau ada di paste)
+          display = `<b>${rdVal.trim()}</b> <span style="color:#60a5fa;font-size:11px;" title="Klik untuk tambah list ref domain">✎ list</span>`;
         } else {
           display = rdVal.length > 30 ? rdVal.slice(0, 30) + '…' : rdVal;
         }
