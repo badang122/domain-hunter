@@ -1303,15 +1303,14 @@
       💾 <b>Data tersimpan PERMANEN</b> di browser (localStorage). Tidak hilang meski tutup browser. Hanya hilang kalau kamu Clear Browser Data atau hapus manual via 🗑/💀. Sarankan <a href="#" onclick="event.preventDefault();pasteBackupJSON();" style="color:#34d399;text-decoration:underline;">download backup JSON</a> tiap minggu biar aman.
     </div>
     <textarea id="pasteText" rows="10" style="width:100%;font-family:monospace;font-size:13px;"
-              placeholder="Contoh (Domain DA PA SS Age DR UR BL RD GoodBacklinks):
-example.com	25	30	22	18	1	5K	120	5	gravatar.com, adobe.com, behance.net
-another.org	40	45	35	28	2	12K	300	8	issuu.com, twitch.tv, gitlab.com, heylink.me
-mydomain.net	18	20	15	12	3	2K	50	3	wikipedia.org, squarespace.com
+              placeholder="Contoh (Domain DA PA SS Age DR UR BL RD GoodBacklinks [Expired date]):
+example.com	25	30	22	18	1	5K	120	5	gravatar.com, adobe.com	2026-12-31
+another.org	40	45	35	28	2	12K	300	8	issuu.com, twitch.tv	2027-03-15
+mydomain.net	18	20	15	12	3	2K	50	3	wikipedia.org
 
 Atau cukup list domain (auto-fill 0):
 example.com
-another.org
-mydomain.net"></textarea>
+another.org"></textarea>
 
     <div style="font-size:11px;color:var(--muted);margin-top:6px;">💡 Format per row: <code>domain.com  DA PA SS Age DR UR BL <b style="color:#67e8f9;">RD</b>  <b style="color:#34d399;">goodBL1, goodBL2...</b></code> (kolom 9+ jadi GoodBL per-row)</div>
 
@@ -1807,6 +1806,7 @@ mydomain.net"></textarea>
         <th data-sort="bl" data-col="bl">BL</th>
         <th data-sort="rd" data-col="rd">RD</th>
         <th data-col="goodbl">GoodBL</th>
+        <th data-col="expired">EXP</th>
         <th data-sort="nawala" data-col="nawala">Nawala</th>
         <th data-col="notes">Notes</th>
         <th data-col="check">Check</th>
@@ -2012,13 +2012,13 @@ let sortKey = 'score';
 let sortDir = 'desc';
 let sortKeys = []; // for multi-sort
 
-const COLS = ['sel','domain','score','status','da','pa','ss','age','dr','ur','bl','rd','goodbl','nawala','notes','check'];
-const COL_NAMES = { sel:'Select', domain:'Domain', score:'Score', status:'Status', da:'DA', pa:'PA', ss:'SS', dr:'DR', ur:'UR', bl:'BL', rd:'RD', goodbl:'GoodBL', age:'Age', nawala:'Nawala', notes:'Notes', check:'Actions' };
+const COLS = ['sel','domain','score','status','da','pa','ss','age','dr','ur','bl','rd','goodbl','expired','nawala','notes','check'];
+const COL_NAMES = { sel:'Select', domain:'Domain', score:'Score', status:'Status', da:'DA', pa:'PA', ss:'SS', dr:'DR', ur:'UR', bl:'BL', rd:'RD', goodbl:'GoodBL', age:'Age', expired:'EXP', nawala:'Nawala', notes:'Notes', check:'Actions' };
 // Force reset visibleCols kalau tidak punya UR/RD (migration)
 let visibleCols = JSON.parse(localStorage.getItem('dashboard_visible_cols') || 'null');
 const ageIdx = visibleCols?.indexOf('age');
 const drIdx = visibleCols?.indexOf('dr');
-if (!visibleCols || !visibleCols.includes('ur') || !visibleCols.includes('rd') || !visibleCols.includes('goodbl') || (ageIdx > drIdx)) {
+if (!visibleCols || !visibleCols.includes('ur') || !visibleCols.includes('rd') || !visibleCols.includes('goodbl') || !visibleCols.includes('expired') || (ageIdx > drIdx)) {
   visibleCols = [...COLS];
   localStorage.setItem('dashboard_visible_cols', JSON.stringify(visibleCols));
 }
@@ -2136,6 +2136,18 @@ function render() {
         const preview = items.slice(0,2).join(', ');
         const extra = items.length > 2 ? ` <b style="color:#60a5fa;font-size:11px;">(+${items.length-2})</b>` : '';
         return `<td data-field="goodbl" data-domain="${d.domain}" title="${gbl.replace(/"/g,'&quot;')}" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;" onclick="editGoodBL('${d.domain}')"><b style="color:#34d399;">${items.length}</b> · ${preview}${extra}</td>`;
+      })(),
+      expired: (() => {
+        const meta = JSON.parse(localStorage.getItem('dashboard_meta') || '{}')[d.domain] || {};
+        const exp = d.expiryDate || meta.expiryDate || '';
+        if (!exp) return `<td data-field="expired" data-domain="${d.domain}" style="cursor:pointer;color:var(--muted);text-align:center;" onclick="openProp('${d.domain}')" title="Klik untuk set tanggal expired">—</td>`;
+        const days = Math.round((new Date(exp) - new Date()) / 86400000);
+        let color, icon, label;
+        if (days < 0) { color = '#ef4444'; icon = '💀'; label = `Exp ${Math.abs(days)}d ago`; }
+        else if (days <= 30) { color = '#ef4444'; icon = '⏰'; label = `${days}d`; }
+        else if (days <= 90) { color = '#fbbf24'; icon = '⚠️'; label = `${days}d`; }
+        else { color = '#34d399'; icon = '✅'; label = `${days}d`; }
+        return `<td data-field="expired" data-domain="${d.domain}" style="cursor:pointer;color:${color};font-weight:700;text-align:center;" onclick="openProp('${d.domain}')" title="Expired: ${exp} (${label})">${icon} ${label}</td>`;
       })(),
       age: `<td contenteditable="true" data-field="age" data-domain="${d.domain}">${(d.age === '—' || d.age === '-') ? '—' : (d.age || '—')}</td>`,
       nawala: `<td>${d.nawala === 'blocked' ? '<span class="bad">🔴 Blokir</span>' : d.nawala === 'safe' ? '<span class="good">🟢 Aman</span>' : '<span class="empty">—</span>'} <button class="check-link" style="background:#dc2626;color:white;padding:2px 6px;" onclick="autoCheckNawala('${d.domain}')" title="Cek Nawala otomatis">🔄</button></td>`,
@@ -6140,7 +6152,7 @@ function pasteParseRows(text) {
     const row = {
       domain: firstDomain,
       da: 0, pa: 0, ss: 0, dr: 0, ur: 0, age: 0,
-      bl: '', rd: '', goodbl: ''
+      bl: '', rd: '', goodbl: '', expiryDate: ''
     };
     // Try to parse columns
     // parseNum supports "2,040" → 2040, "-" → 0, empty → 0
@@ -6161,9 +6173,21 @@ function pasteParseRows(text) {
       if (cols[5] !== undefined) row.ur = parseN(cols[5]);
       if (cols[6] !== undefined) row.bl = String(cols[6]).trim();
       row.rd = cols[7] !== undefined ? String(cols[7]).trim() : '';
-      // Kolom 9+ = Good Backlink list (langsung masuk ke field goodbl)
-      const goodBLCols = cols.slice(8).filter(Boolean);
-      if (goodBLCols.length > 0) row.goodbl = goodBLCols.join(' ').trim();
+      // Kolom 9+ = Good Backlink list + optional expiry date (YYYY-MM-DD di akhir)
+      let remaining = cols.slice(8).filter(Boolean);
+      // Deteksi tanggal expiry di akhir (format YYYY-MM-DD atau DD/MM/YYYY)
+      const dateRx = /^(\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{4})$/;
+      if (remaining.length > 0 && dateRx.test(remaining[remaining.length - 1])) {
+        const dateStr = remaining.pop();
+        // Normalize ke YYYY-MM-DD
+        if (dateStr.includes('/')) {
+          const [d, mo, y] = dateStr.split('/');
+          row.expiryDate = `${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`;
+        } else {
+          row.expiryDate = dateStr;
+        }
+      }
+      if (remaining.length > 0) row.goodbl = remaining.join(' ').trim();
     } else if (cols.length === 1) {
       row.da = Math.round(parseN(cols[0]));
     } else if (cols.length === 2) {
@@ -6298,8 +6322,11 @@ function pasteDoImport(rows) {
       ss: p.ss||0, bl: p.bl||'',
       rd: p.rd || '',
       age: p.age||0,
-      goodbl: p.goodbl || globalGoodBL || ''  // per-row > global
+      goodbl: p.goodbl || globalGoodBL || '',
+      expiryDate: p.expiryDate || ''
     };
+    // Save expiryDate ke meta juga (dipakai di expired alerts)
+    if (p.expiryDate) saveMeta(dom, { expiryDate: p.expiryDate });
     // Preserve existing meta saat update (jangan overwrite)
     // Kalau domain di deleted list, hapus dari deleted (restore)
     const delIdx = deleted.indexOf(dom);
