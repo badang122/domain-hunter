@@ -1806,7 +1806,7 @@ another.org"></textarea>
         <th data-sort="bl" data-col="bl">BL</th>
         <th data-sort="rd" data-col="rd">RD</th>
         <th data-col="goodbl">GoodBL</th>
-        <th data-col="expired">EXP</th>
+        <th data-sort="expired" data-col="expired">EXP</th>
         <th data-sort="nawala" data-col="nawala">Nawala</th>
         <th data-col="notes">Notes</th>
         <th data-col="check">Check</th>
@@ -2141,13 +2141,19 @@ function render() {
         const meta = JSON.parse(localStorage.getItem('dashboard_meta') || '{}')[d.domain] || {};
         const exp = d.expiryDate || meta.expiryDate || '';
         if (!exp) return `<td data-field="expired" data-domain="${d.domain}" style="cursor:pointer;color:var(--muted);text-align:center;" onclick="openProp('${d.domain}')" title="Klik untuk set tanggal expired">—</td>`;
-        const days = Math.round((new Date(exp) - new Date()) / 86400000);
-        let color, icon, label;
-        if (days < 0) { color = '#ef4444'; icon = '💀'; label = `Exp ${Math.abs(days)}d ago`; }
-        else if (days <= 30) { color = '#ef4444'; icon = '⏰'; label = `${days}d`; }
-        else if (days <= 90) { color = '#fbbf24'; icon = '⚠️'; label = `${days}d`; }
-        else { color = '#34d399'; icon = '✅'; label = `${days}d`; }
-        return `<td data-field="expired" data-domain="${d.domain}" style="cursor:pointer;color:${color};font-weight:700;text-align:center;" onclick="openProp('${d.domain}')" title="Expired: ${exp} (${label})">${icon} ${label}</td>`;
+        const dt = new Date(exp);
+        if (isNaN(dt.getTime())) return `<td data-field="expired" data-domain="${d.domain}" style="color:var(--muted);text-align:center;">—</td>`;
+        const days = Math.round((dt - new Date()) / 86400000);
+        let color, icon;
+        if (days < 0) { color = '#ef4444'; icon = '💀'; }
+        else if (days <= 30) { color = '#ef4444'; icon = '⏰'; }
+        else if (days <= 90) { color = '#fbbf24'; icon = '⚠️'; }
+        else { color = '#34d399'; icon = '✅'; }
+        // Format: "Apr 21, 2026"
+        const months = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+        const formatted = `${months[dt.getMonth()]} ${dt.getDate()}, ${dt.getFullYear()}`;
+        const tooltip = days < 0 ? `EXPIRED ${Math.abs(days)} hari lalu` : `${days} hari lagi`;
+        return `<td data-field="expired" data-domain="${d.domain}" data-sort-val="${exp}" style="cursor:pointer;color:${color};font-weight:700;text-align:center;white-space:nowrap;" onclick="openProp('${d.domain}')" title="${tooltip}">${icon} ${formatted}</td>`;
       })(),
       age: `<td contenteditable="true" data-field="age" data-domain="${d.domain}">${(d.age === '—' || d.age === '-') ? '—' : (d.age || '—')}</td>`,
       nawala: `<td>${d.nawala === 'blocked' ? '<span class="bad">🔴 Blokir</span>' : d.nawala === 'safe' ? '<span class="good">🟢 Aman</span>' : '<span class="empty">—</span>'} <button class="check-link" style="background:#dc2626;color:white;padding:2px 6px;" onclick="autoCheckNawala('${d.domain}')" title="Cek Nawala otomatis">🔄</button></td>`,
@@ -2288,10 +2294,18 @@ function applySort() {
     if (ap !== bp) return bp - ap;
 
     const keys = sortKeys.length ? sortKeys : [{ key: sortKey, dir: sortDir }];
+    const metaAll = JSON.parse(localStorage.getItem('dashboard_meta') || '{}');
     for (const { key, dir } of keys) {
       let av, bv;
       if (key === 'bl') { av = parseBL(a.bl); bv = parseBL(b.bl); }
       else if (key === 'score') { av = calcScore(a); bv = calcScore(b); }
+      else if (key === 'expired') {
+        // Sort by expiry date (earliest first = closest to expire)
+        const aexp = a.expiryDate || (metaAll[a.domain]||{}).expiryDate || '';
+        const bexp = b.expiryDate || (metaAll[b.domain]||{}).expiryDate || '';
+        av = aexp ? new Date(aexp).getTime() : Infinity;
+        bv = bexp ? new Date(bexp).getTime() : Infinity;
+      }
       else { av = a[key]; bv = b[key]; }
       if (typeof av === 'string') { av = av.toLowerCase(); bv = (bv||'').toLowerCase(); }
       let cmp = 0;
