@@ -2143,7 +2143,7 @@ function render() {
       check: `<td><div class="row-actions">
         <button class="row-btn ai" onclick="openDomainAI('${d.domain}')" title="🤖 AI Tools">🤖</button>
         <button class="row-btn edit" onclick="openEditDomain('${d.domain}')" title="✏️ Edit full">✏️</button>
-        <button class="row-btn copy" onclick="copyDomain('${d.domain}')" title="📋 Copy domain">📋</button>
+        <button class="row-btn copy" onclick="copyDomain('${d.domain}', event)" title="📋 Copy domain">📋</button>
         <button class="row-btn prop" onclick="openProp('${d.domain}')" title="🏠 Property: Deal, Tags, Expiry">🏠</button>
         <button class="row-btn del" onclick="deleteDomain('${d.domain}')" title="🗑 Delete (restorable)">🗑</button>
         <button class="row-btn nuke" onclick="deleteDomainPermanent('${d.domain}')" title="💀 Hapus Permanen">💀</button>
@@ -3177,13 +3177,14 @@ function clearPermanentBlocklist() {
   toast('Blocklist cleared. Reload untuk effect.', 'success');
 }
 
-function copyDomain(domain) {
+function copyDomain(domain, evt) {
+  const el = evt?.target || (window.event && window.event.target);
   navigator.clipboard.writeText(domain).then(() => {
-    const el = event.target;
+    if (!el) return;
     const orig = el.textContent;
     el.textContent = '✓';
     setTimeout(() => el.textContent = orig, 1000);
-  });
+  }).catch(() => {});
 }
 
 function changeStatus(domain) {
