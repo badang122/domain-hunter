@@ -2294,7 +2294,6 @@ function applySort() {
     if (ap !== bp) return bp - ap;
 
     const keys = sortKeys.length ? sortKeys : [{ key: sortKey, dir: sortDir }];
-    const metaAll = JSON.parse(localStorage.getItem('dashboard_meta') || '{}');
     for (const { key, dir } of keys) {
       let av, bv;
       if (key === 'bl') { av = parseBL(a.bl); bv = parseBL(b.bl); }
