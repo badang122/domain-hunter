@@ -6284,9 +6284,18 @@ function pasteParseRows(text) {
       row.dr = Math.round(parseN(cols[4]));
       if (cols[5] !== undefined) row.ur = parseN(cols[5]);
       if (cols[6] !== undefined) row.bl = String(cols[6]).trim();
-      row.rd = cols[7] !== undefined ? String(cols[7]).trim() : '';
-      // Kolom 9+ = Good Backlink list + optional expiry date (YYYY-MM-DD di akhir)
-      let remaining = cols.slice(8).filter(Boolean);
+      // RD = angka di kolom 8. Kalau kolom 8 bukan numeric (misal langsung domain name),
+      // artinya user tidak kasih RD count → skip RD, shift semua ke GoodBL
+      const col7 = cols[7] !== undefined ? String(cols[7]).trim() : '';
+      const col7isNum = /^[\d.,]+$/.test(col7); // angka dengan/tanpa separator
+      let remaining;
+      if (col7isNum) {
+        row.rd = col7;
+        remaining = cols.slice(8).filter(Boolean);
+      } else {
+        row.rd = ''; // kosong — user tidak kasih RD count
+        remaining = cols.slice(7).filter(Boolean); // semua dari kolom 7+ = GoodBL
+      }
       // Deteksi tanggal expiry di akhir (format YYYY-MM-DD atau DD/MM/YYYY)
       const dateRx = /^(\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{4})$/;
       if (remaining.length > 0 && dateRx.test(remaining[remaining.length - 1])) {
