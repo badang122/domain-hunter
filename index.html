@@ -6184,29 +6184,33 @@ function openPasteImport() {
 }
 function closePasteImport() { document.getElementById('pasteImportModal').classList.remove('active'); }
 
-// Parse berbagai format tanggal → "YYYY-MM-DD"
-function parseDateFlexible(str) {
+// Parse berbagai format tanggal → "YYYY-MM-DD" (+ opsional tambah N tahun)
+function parseDateFlexible(str, addYears = 0) {
   if (!str) return null;
   const s = String(str).trim();
-  // Format 1: YYYY-MM-DD
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  // Format 2: DD/MM/YYYY atau MM/DD/YYYY (ambigu, asumsikan DD/MM jika hari>12)
-  const m1 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (m1) {
-    const [_, a, b, y] = m1;
-    // Asumsi DD/MM kalau a > 12
-    const [d, mo] = parseInt(a) > 12 ? [a, b] : [b, a];
-    return `${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  let y, mo, d;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    [y, mo, d] = s.split('-');
+  } else {
+    const m1 = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (m1) {
+      const [_, a, b, yr] = m1;
+      [d, mo] = parseInt(a) > 12 ? [a, b] : [b, a];
+      y = yr;
+    } else {
+      const dt = new Date(s);
+      if (!isNaN(dt.getTime()) && dt.getFullYear() > 1900 && dt.getFullYear() < 2100) {
+        y = dt.getFullYear();
+        mo = String(dt.getMonth() + 1).padStart(2,'0');
+        d = String(dt.getDate()).padStart(2,'0');
+      } else {
+        return null;
+      }
+    }
   }
-  // Format 3: "Apr 21, 2026" atau "April 21, 2026"
-  const dt = new Date(s);
-  if (!isNaN(dt.getTime()) && dt.getFullYear() > 1900 && dt.getFullYear() < 2100) {
-    const y = dt.getFullYear();
-    const mo = String(dt.getMonth() + 1).padStart(2,'0');
-    const d = String(dt.getDate()).padStart(2,'0');
-    return `${y}-${mo}-${d}`;
-  }
-  return null;
+  // Tambah N tahun (default 1 tahun untuk domain drop date → next expiry)
+  const finalY = parseInt(y) + addYears;
+  return `${finalY}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
 }
 
 // Auto-detect separator + parse rows + support date header
@@ -6219,10 +6223,11 @@ function pasteParseRows(text) {
     // Cek kalau line ini cuma tanggal (bukan ada domain)
     // Domain MUST contain dot + TLD. Date-only line biasanya "Apr 21, 2026" atau "2026-04-21"
     if (!line.match(/[a-z0-9][-a-z0-9]*\.[a-z]{2,}/i)) {
-      const dt = parseDateFlexible(line);
+      // Paste tanggal header = drop date → next expiry = 1 tahun setelahnya
+      const dt = parseDateFlexible(line, 1);
       if (dt) {
         currentExpiryDate = dt;
-        continue; // skip baris ini, jangan di-parse sbg row
+        continue;
       }
     }
     let parts;
