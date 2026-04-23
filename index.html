@@ -1782,6 +1782,7 @@ another.org"></textarea>
         <th data-sort="rd" data-col="rd">RD</th>
         <th data-col="goodbl">GoodBL</th>
         <th data-sort="expired" data-col="expired">EXP</th>
+        <th data-col="provider">Provider</th>
         <th data-sort="nawala" data-col="nawala">Nawala</th>
         <th data-col="notes">Notes</th>
         <th data-col="check">Check</th>
@@ -2084,13 +2085,13 @@ let sortKey = localStorage.getItem('dashboard_sortKey') || 'expired';
 let sortDir = localStorage.getItem('dashboard_sortDir') || 'asc';
 let sortKeys = []; // for multi-sort
 
-const COLS = ['sel','domain','score','status','da','pa','ss','age','dr','ur','bl','rd','goodbl','expired','nawala','notes','check'];
-const COL_NAMES = { sel:'Select', domain:'Domain', score:'Score', status:'Status', da:'DA', pa:'PA', ss:'SS', dr:'DR', ur:'UR', bl:'BL', rd:'RD', goodbl:'GoodBL', age:'Age', expired:'EXP', nawala:'Nawala', notes:'Notes', check:'Actions' };
+const COLS = ['sel','domain','score','status','da','pa','ss','age','dr','ur','bl','rd','goodbl','expired','provider','nawala','notes','check'];
+const COL_NAMES = { sel:'Select', domain:'Domain', score:'Score', status:'Status', da:'DA', pa:'PA', ss:'SS', dr:'DR', ur:'UR', bl:'BL', rd:'RD', goodbl:'GoodBL', age:'Age', expired:'EXP', provider:'Provider', nawala:'Nawala', notes:'Notes', check:'Actions' };
 // Force reset visibleCols kalau tidak punya UR/RD (migration)
 let visibleCols = JSON.parse(localStorage.getItem('dashboard_visible_cols') || 'null');
 const ageIdx = visibleCols?.indexOf('age');
 const drIdx = visibleCols?.indexOf('dr');
-if (!visibleCols || !visibleCols.includes('ur') || !visibleCols.includes('rd') || !visibleCols.includes('goodbl') || !visibleCols.includes('expired') || (ageIdx > drIdx)) {
+if (!visibleCols || !visibleCols.includes('ur') || !visibleCols.includes('rd') || !visibleCols.includes('goodbl') || !visibleCols.includes('expired') || !visibleCols.includes('provider') || (ageIdx > drIdx)) {
   visibleCols = [...COLS];
   localStorage.setItem('dashboard_visible_cols', JSON.stringify(visibleCols));
 }
@@ -2209,6 +2210,17 @@ function render() {
         const preview = items.slice(0,2).join(', ');
         const extra = items.length > 2 ? ` <b style="color:#60a5fa;font-size:11px;">(+${items.length-2})</b>` : '';
         return `<td data-field="goodbl" data-domain="${d.domain}" title="${gbl.replace(/"/g,'&quot;')}" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;" onclick="editGoodBL('${d.domain}')"><b style="color:#34d399;">${items.length}</b> · ${preview}${extra}</td>`;
+      })(),
+      provider: (() => {
+        const meta = JSON.parse(localStorage.getItem('dashboard_meta') || '{}')[d.domain] || {};
+        const prov = d.provider || meta.registrar || meta.provider || '';
+        if (!prov) return `<td data-field="provider" data-domain="${d.domain}" style="cursor:pointer;color:var(--muted);" onclick="editProvider('${d.domain}')">📝 Set</td>`;
+        // Color per provider common
+        const colorMap = { 'namecheap':'#ff5a00','godaddy':'#0d8a00','dynadot':'#6366f1','porkbun':'#f093fb','cloudflare':'#f97316','google':'#4285f4','niagahoster':'#ef4444','hostinger':'#7c3aed','name.com':'#10b981' };
+        const k = prov.toLowerCase().replace(/\s+/g,'');
+        const color = Object.keys(colorMap).find(key => k.includes(key));
+        const bg = color ? colorMap[color] : '#475569';
+        return `<td data-field="provider" data-domain="${d.domain}" style="cursor:pointer;" onclick="editProvider('${d.domain}')" title="Klik untuk edit"><span style="background:${bg};color:white;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700;">${prov}</span></td>`;
       })(),
       expired: (() => {
         const meta = JSON.parse(localStorage.getItem('dashboard_meta') || '{}')[d.domain] || {};
@@ -6127,6 +6139,46 @@ async function parseBulkImport(file) {
     }
   };
   reader.readAsArrayBuffer(file);
+}
+
+// Edit domain provider/registrar quick
+function editProvider(domain) {
+  const d = allData.find(x => x.domain === domain);
+  if (!d) return;
+  const meta = JSON.parse(localStorage.getItem('dashboard_meta') || '{}')[domain] || {};
+  const current = d.provider || meta.provider || meta.registrar || '';
+  const options = ['Namecheap','GoDaddy','Dynadot','Porkbun','Cloudflare','Google Domains','Niagahoster','Hostinger','Name.com','1and1','Gandi','Other'];
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(6px);z-index:99999;display:flex;align-items:center;justify-content:center;';
+  modal.innerHTML = `
+    <div style="background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:24px;max-width:480px;width:92%;">
+      <h2 style="margin-bottom:10px;">🏢 Provider / Registrar — ${domain}</h2>
+      <p style="color:var(--muted);font-size:13px;margin-bottom:10px;">Pilih atau ketik nama provider:</p>
+      <input id="provEdit" value="${current}" list="provSuggest" style="width:100%;padding:8px 12px;font-size:14px;">
+      <datalist id="provSuggest">${options.map(o => `<option value="${o}">`).join('')}</datalist>
+      <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:4px;">
+        ${options.map(o => `<button type="button" onclick="document.getElementById('provEdit').value='${o}';" style="background:var(--bg-soft);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">${o}</button>`).join('')}
+      </div>
+      <div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end;">
+        <button onclick="this.closest('[style*=backdrop]').remove()">Cancel</button>
+        <button class="btn-danger" onclick="document.getElementById('provEdit').value=''">Clear</button>
+        <button class="btn-primary" onclick="saveProvider('${domain}')">💾 Save</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  setTimeout(() => document.getElementById('provEdit')?.focus(), 100);
+}
+function saveProvider(domain) {
+  const val = document.getElementById('provEdit').value.trim();
+  const d = allData.find(x => x.domain === domain);
+  if (d) d.provider = val;
+  const custom = JSON.parse(localStorage.getItem('dashboard_custom_domains') || '[]');
+  const ci = custom.findIndex(x => x.domain === domain);
+  if (ci >= 0) { custom[ci].provider = val; localStorage.setItem('dashboard_custom_domains', JSON.stringify(custom)); }
+  saveMeta(domain, { provider: val, registrar: val });
+  document.querySelector('[style*=backdrop]')?.remove();
+  toast(`🏢 Provider ${domain} → ${val || '(cleared)'}`, 'success', 2500);
+  render();
 }
 
 // Edit GoodBL list per-domain via modal
