@@ -1524,49 +1524,8 @@ another.org"></textarea>
 <!-- ═══ TOAST NOTIFICATION CONTAINER ═══ -->
 <div id="toastContainer" style="position:fixed;top:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:10px;pointer-events:none;"></div>
 
-<!-- ═══ FLOATING TOOLS — Sticky Notes + Pomodoro (kanan, music kiri) ═══ -->
-<div id="floatingTools" style="position:fixed;bottom:24px;right:24px;z-index:998;display:flex;flex-direction:column;gap:10px;align-items:flex-end;">
-  <!-- Pomodoro Timer (collapsible) -->
-  <div id="pomodoroWidget" class="ft-widget collapsed">
-    <button class="ft-toggle" onclick="togglePomodoro()" title="Pomodoro Timer">
-      <span id="pomoIcon">🍅</span>
-      <span id="pomoTime" style="font-weight:700;margin-left:6px;display:none;">25:00</span>
-    </button>
-    <div class="ft-body" id="pomoBody">
-      <div style="text-align:center;margin-bottom:10px;">
-        <div id="pomoDisplay" style="font-size:36px;font-weight:700;color:#f87171;font-variant-numeric:tabular-nums;">25:00</div>
-        <div id="pomoStatus" style="color:var(--muted);font-size:11px;margin-top:4px;">Ready to focus</div>
-      </div>
-      <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;">
-        <button onclick="pomoStart()" id="pomoStartBtn" class="btn-success" style="padding:6px 12px;font-size:12px;">▶️ Start</button>
-        <button onclick="pomoPause()" id="pomoPauseBtn" style="padding:6px 12px;font-size:12px;display:none;">⏸️ Pause</button>
-        <button onclick="pomoReset()" class="btn-danger" style="padding:6px 12px;font-size:12px;">🔄 Reset</button>
-      </div>
-      <div style="display:flex;gap:6px;margin-top:8px;justify-content:center;">
-        <button onclick="pomoSet(25,5)" class="ft-preset" title="25min focus / 5min break">25/5</button>
-        <button onclick="pomoSet(50,10)" class="ft-preset" title="50min focus / 10min break">50/10</button>
-        <button onclick="pomoSet(15,3)" class="ft-preset" title="15min focus / 3min break">15/3</button>
-      </div>
-      <div style="text-align:center;margin-top:8px;font-size:11px;color:var(--muted);">
-        🏆 <span id="pomoCount">0</span> sesi selesai hari ini
-      </div>
-    </div>
-  </div>
-
-  <!-- Sticky Notes (collapsible) -->
-  <div id="stickyNotesWidget" class="ft-widget collapsed">
-    <button class="ft-toggle" onclick="toggleStickyNotes()" title="Sticky Notes">
-      📌 <span id="stickyCount" style="font-size:10px;background:#ef4444;color:white;border-radius:8px;padding:1px 5px;margin-left:4px;display:none;">0</span>
-    </button>
-    <div class="ft-body" id="stickyBody">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <b style="font-size:13px;color:#fbbf24;">📌 Sticky Notes</b>
-        <button onclick="addStickyNote()" style="background:#10b981;color:white;border:0;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">+ Add</button>
-      </div>
-      <div id="stickyList" style="max-height:280px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;"></div>
-    </div>
-  </div>
-</div>
+<!-- Pomodoro + Sticky Notes removed per user request -->
+<div id="floatingTools" style="display:none;"></div>
 
 <style>
 .ft-widget {
@@ -7316,10 +7275,7 @@ function changeMusicVolume(val) {
   if (musicAudio) musicAudio.volume = musicState.vol;
 }
 
-// Init music player after dashboard ready
-setTimeout(() => {
-  if (currentUser) initMusicPlayer();
-}, 1000);
+// Music player removed per user request
 
 </script>
 
