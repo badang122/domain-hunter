@@ -1510,6 +1510,17 @@ another.org"></textarea>
   </div>
 </div>
 
+<!-- ═══ QUICK SCROLL WIDGET ═══ -->
+<div id="quickScroll" style="position:fixed;right:12px;top:50%;transform:translateY(-50%);z-index:900;display:flex;flex-direction:column;gap:6px;align-items:center;">
+  <button onclick="scrollToTop()" title="Scroll to Top (PageUp)" style="width:36px;height:36px;border-radius:50%;border:0;background:var(--panel);color:var(--text);cursor:pointer;font-size:16px;box-shadow:0 2px 6px rgba(0,0,0,0.3);transition:all 0.2s;">⬆️</button>
+  <div id="qsTrack" onclick="scrollToPercent(event)" style="width:4px;height:200px;background:var(--border);border-radius:2px;cursor:pointer;position:relative;">
+    <div id="qsThumb" style="position:absolute;left:-3px;width:10px;height:30px;background:linear-gradient(135deg,#60a5fa,#8b5cf6);border-radius:5px;box-shadow:0 1px 3px rgba(0,0,0,0.5);transition:top 0.1s;"></div>
+  </div>
+  <div id="qsPct" style="font-size:10px;color:var(--muted);font-weight:700;min-width:32px;text-align:center;">0%</div>
+  <button onclick="scrollToMid()" title="Scroll to Middle" style="width:36px;height:36px;border-radius:50%;border:0;background:var(--panel);color:var(--text);cursor:pointer;font-size:12px;box-shadow:0 2px 6px rgba(0,0,0,0.3);">⇅</button>
+  <button onclick="scrollToBottom()" title="Scroll to Bottom (PageDn)" style="width:36px;height:36px;border-radius:50%;border:0;background:var(--panel);color:var(--text);cursor:pointer;font-size:16px;box-shadow:0 2px 6px rgba(0,0,0,0.3);">⬇️</button>
+</div>
+
 <!-- ═══ TOAST NOTIFICATION CONTAINER ═══ -->
 <div id="toastContainer" style="position:fixed;top:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:10px;pointer-events:none;"></div>
 
@@ -6613,6 +6624,38 @@ function ssHandleFile(file) {
     document.getElementById('ssPreview').style.display = '';
   };
   reader.readAsDataURL(file);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 🚀 QUICK SCROLL — side widget untuk navigate cepat tabel panjang
+// ═══════════════════════════════════════════════════════════════
+function scrollToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
+function scrollToBottom() { window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); }
+function scrollToMid() { window.scrollTo({ top: document.body.scrollHeight / 2, behavior: 'smooth' }); }
+function scrollToPercent(e) {
+  const track = document.getElementById('qsTrack');
+  const rect = track.getBoundingClientRect();
+  const y = e.clientY - rect.top;
+  const pct = Math.max(0, Math.min(1, y / rect.height));
+  window.scrollTo({ top: pct * (document.body.scrollHeight - window.innerHeight), behavior: 'smooth' });
+}
+// Update thumb position on scroll
+window.addEventListener('scroll', () => {
+  const track = document.getElementById('qsTrack');
+  const thumb = document.getElementById('qsThumb');
+  const pct = document.getElementById('qsPct');
+  if (!track || !thumb) return;
+  const maxScroll = document.body.scrollHeight - window.innerHeight;
+  const pctVal = maxScroll > 0 ? (window.scrollY / maxScroll) : 0;
+  const thumbHeight = 30;
+  thumb.style.top = `${pctVal * (track.offsetHeight - thumbHeight)}px`;
+  if (pct) pct.textContent = Math.round(pctVal * 100) + '%';
+}, { passive: true });
+
+// Hide pada mobile kecil
+if (window.innerWidth < 600) {
+  const qs = document.getElementById('quickScroll');
+  if (qs) qs.style.display = 'none';
 }
 
 // ═══════════════════════════════════════════════════════════════
