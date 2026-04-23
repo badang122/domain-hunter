@@ -265,8 +265,8 @@
     color: var(--muted);
     cursor: pointer;
     user-select: none;
-    border-bottom: 1px solid var(--border);
-    border-right: 1px solid var(--border);
+    border-bottom: 2px solid rgba(148,163,184,0.4);
+    border-right: 1px solid rgba(148,163,184,0.35);
     font-weight: 700;
     position: sticky;
     top: 0;
@@ -276,7 +276,7 @@
   th:hover { color: var(--text); background: var(--panel-hover); }
   th.sorted-asc::after { content: " ↑"; color: var(--accent); }
   th.sorted-desc::after { content: " ↓"; color: var(--accent); }
-  td { padding: 10px; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); font-size: 13px; }
+  td { padding: 10px; border-bottom: 1px solid rgba(148,163,184,0.22); border-right: 1px solid rgba(148,163,184,0.22); font-size: 13px; }
   td:last-child { border-right: none; }
   td[contenteditable]:focus { outline: 2px solid var(--accent); background: var(--bg-soft); border-radius: 4px; }
   tr:hover td { background: var(--panel-hover); }
