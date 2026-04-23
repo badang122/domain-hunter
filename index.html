@@ -2077,8 +2077,9 @@ window.forceRebuild = function() {
 };
 
 let filteredData = [...allData];
-let sortKey = 'score';
-let sortDir = 'desc';
+// Default sort by Expired date (earliest first) — user prefer this order
+let sortKey = localStorage.getItem('dashboard_sortKey') || 'expired';
+let sortDir = localStorage.getItem('dashboard_sortDir') || 'asc';
 let sortKeys = []; // for multi-sort
 
 const COLS = ['sel','domain','score','status','da','pa','ss','age','dr','ur','bl','rd','goodbl','expired','nawala','notes','check'];
@@ -3982,6 +3983,8 @@ document.querySelectorAll('#table th[data-sort]').forEach(th => {
       sortKeys = [];
       if (sortKey === key) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
       else { sortKey = key; sortDir = 'desc'; }
+      localStorage.setItem('dashboard_sortKey', sortKey);
+      localStorage.setItem('dashboard_sortDir', sortDir);
     }
     document.querySelectorAll('#table th').forEach(t => t.classList.remove('sorted-asc','sorted-desc'));
     th.classList.add('sorted-' + (sortKeys.length ? sortKeys[sortKeys.length-1].dir : sortDir));
