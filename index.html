@@ -35,34 +35,57 @@
     --text: #0f172a;
     --muted: #475569;
   }
-  /* Light mode overrides — force dark text untuk element yg hardcode white */
-  body.light h1, body.light h2, body.light h3, body.light h4, body.light h5, body.light h6,
-  body.light label, body.light p, body.light span, body.light div, body.light input, body.light textarea, body.light select,
-  body.light td, body.light th, body.light li, body.light a {
-    color: var(--text);
+  /* Light mode overrides — comprehensive readability fix */
+  body.light {
+    background: #f1f5f9;
+    color: #0f172a;
   }
+  body.light .panel, body.light .modal {
+    background: #ffffff !important;
+    color: #0f172a;
+    border-color: rgba(0,0,0,0.1);
+  }
+  body.light .stat-card {
+    background: #ffffff !important;
+    color: #0f172a;
+    border-color: rgba(0,0,0,0.1);
+  }
+  body.light h1, body.light h2, body.light h3, body.light h4, body.light h5, body.light h6 {
+    color: #1e1b4b !important;
+  }
+  body.light h1 { background: linear-gradient(135deg,#4f46e5,#8b5cf6,#ec4899); -webkit-background-clip: text; background-clip: text; color: transparent !important; }
+  body.light label, body.light p, body.light .field-label, body.light .filter-label, body.light .hint {
+    color: #334155 !important;
+  }
+  body.light td, body.light th { color: #0f172a; }
   body.light input[type="text"], body.light input[type="number"], body.light input[type="password"],
   body.light input[type="date"], body.light input[type="search"], body.light textarea, body.light select {
-    background: #ffffff;
-    color: #0f172a;
-    border-color: rgba(0,0,0,0.15);
+    background: #ffffff !important;
+    color: #0f172a !important;
+    border: 1px solid rgba(0,0,0,0.15) !important;
   }
-  body.light input::placeholder, body.light textarea::placeholder {
-    color: #94a3b8;
-  }
-  /* Label badges tetap white on colored bg — good */
-  body.light .field-icon, body.light button.btn-primary, body.light button.btn-success, body.light button.btn-danger,
-  body.light button.btn-warn, body.light button.btn-purple, body.light .btn-ai, body.light .tag, body.light .check-link, body.light .row-btn,
-  body.light .score, body.light .fav-star.active {
+  body.light input::placeholder, body.light textarea::placeholder { color: #94a3b8 !important; }
+  body.light code { background: #f1f5f9; color: #0f172a; padding: 1px 4px; border-radius: 3px; }
+  body.light .quick-link { background: #ffffff; color: #0f172a; }
+  body.light .muted, body.light [style*="color:var(--muted)"] { color: #475569 !important; }
+  /* Preserve: button colored backgrounds must keep white text */
+  body.light .btn-primary, body.light .btn-success, body.light .btn-danger, body.light .btn-warn,
+  body.light .btn-purple, body.light .btn-ai, body.light .field-icon,
+  body.light .row-btn, body.light .check-link, body.light .score,
+  body.light .tag, body.light .fav-star.active, body.light button[style*="background:#"],
+  body.light button[style*="background: linear-gradient"], body.light button[style*="background:linear-gradient"] {
     color: white !important;
   }
-  /* Tabel cells readable */
-  body.light td.good { color: #059669; }
-  body.light td.mid { color: #d97706; }
-  body.light td.bad { color: #dc2626; }
-  body.light td.empty { color: #94a3b8; }
-  body.light .domain { color: #4f46e5; }
-  body.light h1, body.light h2 { color: #1e1b4b; }
+  /* Tag chip in light mode */
+  body.light .tag-chip { background: rgba(240,147,251,0.15); color: #c026d3; }
+  body.light .domain { color: #4f46e5 !important; }
+  /* Table color coding better contrast on white */
+  body.light td.good { color: #047857 !important; background: rgba(16,185,129,0.08); }
+  body.light td.mid  { color: #b45309 !important; background: rgba(245,158,11,0.08); }
+  body.light td.bad  { color: #b91c1c !important; background: rgba(239,68,68,0.08); }
+  body.light td.empty { color: #94a3b8 !important; }
+  /* Subtitle + muted text */
+  body.light .subtitle { color: #475569 !important; }
   body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     background: var(--bg);
