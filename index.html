@@ -6265,8 +6265,8 @@ function pasteParseRows(text) {
     // Cek kalau line ini cuma tanggal (bukan ada domain)
     // Domain MUST contain dot + TLD. Date-only line biasanya "Apr 21, 2026" atau "2026-04-21"
     if (!line.match(/[a-z0-9][-a-z0-9]*\.[a-z]{2,}/i)) {
-      // Paste tanggal header = drop date → next expiry = 1 tahun setelahnya
-      const dt = parseDateFlexible(line, 1);
+      // Paste tanggal header — gunakan EXAKT dari paste (tidak auto +1 tahun)
+      const dt = parseDateFlexible(line, 0);
       if (dt) {
         currentExpiryDate = dt;
         continue;
