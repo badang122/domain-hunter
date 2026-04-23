@@ -1817,7 +1817,8 @@ another.org"></textarea>
   </div>
 
   <div style="color:var(--muted);font-size:11px;margin-top:20px;text-align:center;">
-    Data stored in browser (localStorage) · v2.1
+    <div id="persistIndicator" style="font-weight:700;margin-bottom:4px;">💾 Loading...</div>
+    Data stored in browser (localStorage + IndexedDB) · v2.2
   </div>
 </div>
 
@@ -1970,7 +1971,27 @@ setTimeout(async () => {
   const lsCount = JSON.parse(localStorage.getItem('dashboard_custom_domains') || '[]').length;
   if (lsCount > 0) return; // localStorage OK, no recovery needed
   const idbData = await _idbGet('custom_domains');
-  if (!idbData || !Array.isArray(idbData) || idbData.length === 0) return;
+  if (!idbData || !Array.isArray(idbData) || idbData.length === 0) {
+    // IDB juga kosong — mungkin private mode / clear-on-close
+    // Cek apakah storage betul2 bisa persist dengan test write
+    const testKey = '__persist_test__';
+    const testVal = Date.now().toString();
+    try {
+      localStorage.setItem(testKey, testVal);
+      const read = localStorage.getItem(testKey);
+      localStorage.removeItem(testKey);
+      if (read !== testVal) throw new Error('localStorage broken');
+    } catch {
+      // Storage broken — show warning
+      setTimeout(() => {
+        const warn = document.createElement('div');
+        warn.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#ef4444;color:white;padding:12px;text-align:center;z-index:99999;font-weight:700;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,0.3);';
+        warn.innerHTML = `⚠️ <b>Browser block penyimpanan</b>! Data tidak akan tersimpan. Buka tanpa Incognito / matikan privacy extension. <button onclick="this.parentElement.remove()" style="margin-left:10px;padding:2px 8px;background:white;color:#ef4444;border:0;border-radius:4px;">×</button>`;
+        document.body.appendChild(warn);
+      }, 2000);
+    }
+    return;
+  }
   console.warn('[IDB Recovery] localStorage kosong, restore', idbData.length, 'domain dari IndexedDB');
   _origSetItem('dashboard_custom_domains', JSON.stringify(idbData));
   _origSetItem('dashboard_custom_domains_backup', JSON.stringify(idbData));
@@ -1981,6 +2002,25 @@ setTimeout(async () => {
     setTimeout(() => location.reload(), 2500);
   }, 500);
 }, 1500);
+
+// Indicator saved time di footer — visible proof data tersimpan
+setInterval(() => {
+  try {
+    const ts = localStorage.getItem('dashboard_custom_domains_timestamp');
+    const count = JSON.parse(localStorage.getItem('dashboard_custom_domains') || '[]').length;
+    const indicator = document.getElementById('persistIndicator');
+    if (indicator) {
+      if (ts && count > 0) {
+        const date = new Date(parseInt(ts));
+        indicator.innerHTML = `💾 ${count} domain tersimpan · last save ${date.toLocaleString('id-ID')}`;
+        indicator.style.color = '#34d399';
+      } else {
+        indicator.innerHTML = '⚠️ 0 domain — storage mungkin di-block browser';
+        indicator.style.color = '#ef4444';
+      }
+    }
+  } catch {}
+}, 3000);
 
 let allData = parseCSV(rawData);
 const customDomains = loadCustomDomainsWithRecovery();
