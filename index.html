@@ -6634,11 +6634,46 @@ function scrollToBottom() { window.scrollTo({ top: document.body.scrollHeight, b
 function scrollToMid() { window.scrollTo({ top: document.body.scrollHeight / 2, behavior: 'smooth' }); }
 function scrollToPercent(e) {
   const track = document.getElementById('qsTrack');
+  if (!track) return;
   const rect = track.getBoundingClientRect();
   const y = e.clientY - rect.top;
   const pct = Math.max(0, Math.min(1, y / rect.height));
   window.scrollTo({ top: pct * (document.body.scrollHeight - window.innerHeight), behavior: 'smooth' });
 }
+
+// Enable drag pada thumb — user bisa drag manual
+setTimeout(() => {
+  const thumb = document.getElementById('qsThumb');
+  const track = document.getElementById('qsTrack');
+  if (!thumb || !track) return;
+  let dragging = false;
+  const startDrag = () => {
+    dragging = true;
+    document.body.style.userSelect = 'none';
+    thumb.style.cursor = 'grabbing';
+  };
+  const endDrag = () => {
+    dragging = false;
+    document.body.style.userSelect = '';
+    thumb.style.cursor = 'grab';
+  };
+  const moveDrag = (clientY) => {
+    if (!dragging) return;
+    const rect = track.getBoundingClientRect();
+    const y = clientY - rect.top;
+    const pct = Math.max(0, Math.min(1, y / rect.height));
+    const maxScroll = document.body.scrollHeight - window.innerHeight;
+    window.scrollTo({ top: pct * maxScroll, behavior: 'auto' });
+  };
+  thumb.style.cursor = 'grab';
+  thumb.addEventListener('mousedown', e => { e.stopPropagation(); e.preventDefault(); startDrag(); });
+  document.addEventListener('mousemove', e => { if (dragging) { moveDrag(e.clientY); } });
+  document.addEventListener('mouseup', endDrag);
+  // Touch
+  thumb.addEventListener('touchstart', e => { e.stopPropagation(); startDrag(); }, { passive: true });
+  document.addEventListener('touchmove', e => { if (dragging) moveDrag(e.touches[0].clientY); }, { passive: true });
+  document.addEventListener('touchend', endDrag);
+}, 800);
 // Update thumb position on scroll
 window.addEventListener('scroll', () => {
   const track = document.getElementById('qsTrack');
