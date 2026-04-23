@@ -841,6 +841,28 @@
     </label>
     <button class="btn-danger" onclick="clearAll()" style="margin-left:8px;">Clear All Data</button>
 
+    <h3 style="margin:20px 0 8px;">☁️ Cloud Sync (GitHub Gist)</h3>
+    <p style="color:var(--muted);font-size:12px;">Sync data dashboard ke private Gist biar bisa diakses dari device manapun. Gratis, tanpa limit.</p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <div>
+        <label style="font-size:11px;color:var(--muted);">GitHub PAT (scope: gist)</label>
+        <input id="gistToken" type="password" placeholder="github_pat_..." style="width:100%;padding:6px 10px;">
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--muted);">Gist ID (auto-dibuat)</label>
+        <input id="gistId" type="text" placeholder="(kosong untuk auto-create)" style="width:100%;padding:6px 10px;">
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+      <button onclick="saveGistConfig()" class="btn-primary" style="padding:6px 12px;">💾 Save Config</button>
+      <button onclick="gistPushNow()" class="btn-success" style="padding:6px 12px;">⬆️ Push Now (upload ke Gist)</button>
+      <button onclick="gistPullNow()" class="btn-warn" style="padding:6px 12px;">⬇️ Pull Now (ambil dari Gist)</button>
+      <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);">
+        <input type="checkbox" id="gistAutoSync" onchange="localStorage.setItem('dashboard_gist_autosync', this.checked ? '1':'')"> Auto-sync setiap perubahan
+      </label>
+    </div>
+    <div id="gistStatus" style="margin-top:8px;font-size:11px;color:var(--muted);"></div>
+
     <h3 style="margin:20px 0 8px;">💀 Blocklist (Domain Hapus Permanen)</h3>
     <p style="color:var(--muted);font-size:12px;">Domain yang di-hapus permanen masuk sini. Klik ⟲ untuk restore — domain bisa di-import/add lagi.</p>
     <div style="display:flex;gap:8px;margin-bottom:8px;">
@@ -3410,7 +3432,148 @@ function openSettings() {
   document.getElementById('settingsModal').classList.add('active');
   renderColToggles();
   renderBlocklistUI();
+  loadGistConfig();
 }
+
+// ═══════════════════════════════════════════════════════════════
+// ☁️ GITHUB GIST SYNC — cloud backup untuk multi-device
+// ═══════════════════════════════════════════════════════════════
+const GIST_FILENAME = 'domain-hunter-data.json';
+
+function saveGistConfig() {
+  const token = document.getElementById('gistToken').value.trim();
+  const gid = document.getElementById('gistId').value.trim();
+  if (token) localStorage.setItem('dashboard_gist_token', token);
+  if (gid) localStorage.setItem('dashboard_gist_id', gid);
+  toast('☁️ Gist config tersimpan', 'success', 2500);
+  updateGistStatus('Config saved · belum sync');
+}
+
+function loadGistConfig() {
+  const t = document.getElementById('gistToken');
+  const g = document.getElementById('gistId');
+  const a = document.getElementById('gistAutoSync');
+  if (t) t.value = localStorage.getItem('dashboard_gist_token') || '';
+  if (g) g.value = localStorage.getItem('dashboard_gist_id') || '';
+  if (a) a.checked = localStorage.getItem('dashboard_gist_autosync') === '1';
+  const last = localStorage.getItem('dashboard_gist_lastsync');
+  if (last) updateGistStatus(`Last sync: ${new Date(parseInt(last)).toLocaleString('id-ID')}`);
+}
+
+function updateGistStatus(msg, color) {
+  const el = document.getElementById('gistStatus');
+  if (el) { el.textContent = msg; el.style.color = color || 'var(--muted)'; }
+}
+
+function getDashboardData() {
+  return {
+    version: '2.2',
+    exportedAt: new Date().toISOString(),
+    custom_domains: JSON.parse(localStorage.getItem('dashboard_custom_domains') || '[]'),
+    meta: JSON.parse(localStorage.getItem('dashboard_meta') || '{}'),
+    deleted: JSON.parse(localStorage.getItem('dashboard_deleted_domains') || '[]'),
+    blocked: JSON.parse(localStorage.getItem('dashboard_blocked_domains') || '[]'),
+    favorites: JSON.parse(localStorage.getItem('dashboard_favorites') || '[]'),
+    nawalaHistory: JSON.parse(localStorage.getItem('dashboard_nawala_history') || '{}'),
+  };
+}
+
+async function gistPushNow() {
+  const token = localStorage.getItem('dashboard_gist_token');
+  if (!token) { toast('❌ Set GitHub PAT dulu di Settings', 'error', 4000); return; }
+  const gid = localStorage.getItem('dashboard_gist_id');
+  const data = getDashboardData();
+  const content = JSON.stringify(data, null, 2);
+  updateGistStatus('⏳ Uploading ke Gist...', '#fbbf24');
+  try {
+    let res;
+    if (gid) {
+      // Update existing gist
+      res = await fetch(`https://api.github.com/gists/${gid}`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json', 'Content-Type':'application/json' },
+        body: JSON.stringify({ files: { [GIST_FILENAME]: { content } } })
+      });
+    } else {
+      // Create new private gist
+      res = await fetch('https://api.github.com/gists', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json', 'Content-Type':'application/json' },
+        body: JSON.stringify({
+          description: 'Domain Hunter Dashboard auto-sync data',
+          public: false,
+          files: { [GIST_FILENAME]: { content } }
+        })
+      });
+    }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || `HTTP ${res.status}`);
+    }
+    const j = await res.json();
+    localStorage.setItem('dashboard_gist_id', j.id);
+    localStorage.setItem('dashboard_gist_lastsync', Date.now().toString());
+    document.getElementById('gistId').value = j.id;
+    updateGistStatus(`✅ Pushed · Gist ID: ${j.id.slice(0,8)}... · ${data.custom_domains.length} domain`, '#34d399');
+    toast(`☁️ ${data.custom_domains.length} domain upload ke Gist`, 'success', 3000);
+  } catch (e) {
+    updateGistStatus(`❌ Error: ${e.message}`, '#ef4444');
+    toast('Gist push error: ' + e.message, 'error', 4000);
+  }
+}
+
+async function gistPullNow() {
+  const token = localStorage.getItem('dashboard_gist_token');
+  const gid = localStorage.getItem('dashboard_gist_id');
+  if (!token || !gid) { toast('❌ Set PAT + Gist ID dulu', 'error'); return; }
+  updateGistStatus('⏳ Fetching dari Gist...', '#fbbf24');
+  try {
+    const res = await fetch(`https://api.github.com/gists/${gid}`, {
+      headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json' }
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const j = await res.json();
+    const file = j.files[GIST_FILENAME] || Object.values(j.files)[0];
+    if (!file) throw new Error('File tidak ditemukan di Gist');
+    const data = JSON.parse(file.content);
+    if (!confirm(`Overwrite data local dengan ${data.custom_domains?.length || 0} domain dari Gist?`)) return;
+    // Restore ke localStorage
+    if (data.custom_domains) localStorage.setItem('dashboard_custom_domains', JSON.stringify(data.custom_domains));
+    if (data.meta) localStorage.setItem('dashboard_meta', JSON.stringify(data.meta));
+    if (data.deleted) localStorage.setItem('dashboard_deleted_domains', JSON.stringify(data.deleted));
+    if (data.blocked) localStorage.setItem('dashboard_blocked_domains', JSON.stringify(data.blocked));
+    if (data.favorites) localStorage.setItem('dashboard_favorites', JSON.stringify(data.favorites));
+    if (data.nawalaHistory) localStorage.setItem('dashboard_nawala_history', JSON.stringify(data.nawalaHistory));
+    localStorage.setItem('dashboard_gist_lastsync', Date.now().toString());
+    updateGistStatus(`✅ Pulled · ${data.custom_domains?.length || 0} domain · Reload...`, '#34d399');
+    toast(`☁️ ${data.custom_domains?.length || 0} domain restored dari Gist. Reloading...`, 'success', 3000);
+    setTimeout(() => location.reload(), 2000);
+  } catch (e) {
+    updateGistStatus(`❌ Error: ${e.message}`, '#ef4444');
+    toast('Gist pull error: ' + e.message, 'error', 4000);
+  }
+}
+
+// Auto-sync: debounced push after changes
+let _gistTimer = null;
+function gistAutoPush() {
+  if (localStorage.getItem('dashboard_gist_autosync') !== '1') return;
+  if (!localStorage.getItem('dashboard_gist_token')) return;
+  clearTimeout(_gistTimer);
+  _gistTimer = setTimeout(() => gistPushNow(), 8000); // 8s debounce
+}
+
+// Hook auto-sync saat localStorage custom_domains berubah
+const _origSetItemGist = localStorage.setItem;
+localStorage.setItem = function(key, val) {
+  _origSetItemGist.call(this, key, val);
+  if (key === 'dashboard_custom_domains' || key === 'dashboard_meta') {
+    gistAutoPush();
+  }
+};
+
+// Init load saat Settings dibuka
+setTimeout(loadGistConfig, 1500);
 
 // Blocklist manager — view + restore permanent-deleted domains
 function renderBlocklistUI() {
