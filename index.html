@@ -35,9 +35,16 @@
     --text: #0f172a;
     --muted: #475569;
   }
-  /* Light mode overrides — comprehensive readability fix */
+  /* Light mode overrides — AGGRESSIVE readability fix */
   body.light {
     background: #f1f5f9;
+    color: #0f172a;
+  }
+  /* Default ALL text elements to dark — exceptions handled later */
+  body.light * { color: inherit; }
+  body.light body, body.light .container, body.light .topbar > *,
+  body.light .panel *, body.light .modal *, body.light .stat-card *,
+  body.light .quick-link, body.light .field-label, body.light .filter-label {
     color: #0f172a;
   }
   body.light .panel, body.light .modal {
@@ -69,13 +76,46 @@
   body.light .quick-link { background: #ffffff; color: #0f172a; }
   body.light .muted, body.light [style*="color:var(--muted)"] { color: #475569 !important; }
   /* Preserve: button colored backgrounds must keep white text */
-  body.light .btn-primary, body.light .btn-success, body.light .btn-danger, body.light .btn-warn,
-  body.light .btn-purple, body.light .btn-ai, body.light .field-icon,
-  body.light .row-btn, body.light .check-link, body.light .score,
-  body.light .tag, body.light .fav-star.active, body.light button[style*="background:#"],
-  body.light button[style*="background: linear-gradient"], body.light button[style*="background:linear-gradient"] {
+  body.light .btn-primary, body.light .btn-primary *,
+  body.light .btn-success, body.light .btn-success *,
+  body.light .btn-danger, body.light .btn-danger *,
+  body.light .btn-warn, body.light .btn-warn *,
+  body.light .btn-purple, body.light .btn-purple *,
+  body.light .btn-ai, body.light .btn-ai *,
+  body.light .field-icon,
+  body.light .row-btn, body.light .row-btn *,
+  body.light .check-link, body.light .check-link *,
+  body.light .score,
+  body.light .tag, body.light .tag *,
+  body.light .fav-star.active,
+  body.light button[style*="background:#"], body.light button[style*="background:#"] *,
+  body.light button[style*="background: linear-gradient"], body.light button[style*="background: linear-gradient"] *,
+  body.light button[style*="background:linear-gradient"], body.light button[style*="background:linear-gradient"] * {
     color: white !important;
   }
+  /* Topbar user-info buttons with default (non-colored) bg — dark text on light bg */
+  body.light .user-info button:not([class*="btn-"]):not([style*="background"]) {
+    background: #f8fafc !important;
+    color: #0f172a !important;
+    border: 1px solid rgba(0,0,0,0.1);
+  }
+  /* Stat card labels and values */
+  body.light .stat-label { color: #64748b !important; }
+  body.light .stat-value { color: #0f172a !important; }
+  body.light .stat-value.good { color: #047857 !important; }
+  body.light .stat-value.bad { color: #b91c1c !important; }
+  /* Quick links colored icons preserved */
+  body.light .quick-link.ahrefs, body.light .quick-link.domcop, body.light .quick-link.dapa,
+  body.light .quick-link.nawala, body.light .quick-link.moz { color: #0f172a !important; background: #ffffff !important; }
+  /* Muted text in light mode */
+  body.light [style*="var(--muted)"], body.light .hint { color: #475569 !important; }
+  /* Hint tip at bottom */
+  body.light p.hint, body.light .add-form-row + p { color: #475569 !important; }
+  /* Tabel header + cells */
+  body.light th { background: #e2e8f0 !important; color: #1e1b4b !important; }
+  body.light tr:hover td { background: #f1f5f9 !important; }
+  /* Filter bar input */
+  body.light .filter-group label { color: #475569 !important; }
   /* Tag chip in light mode */
   body.light .tag-chip { background: rgba(240,147,251,0.15); color: #c026d3; }
   body.light .domain { color: #4f46e5 !important; }
