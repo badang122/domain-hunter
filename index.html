@@ -3666,6 +3666,37 @@ localStorage.setItem = function(key, val) {
 // Init load saat Settings dibuka
 setTimeout(loadGistConfig, 1500);
 
+// AUTO-PULL on page load — kalau localStorage kosong tapi ada Gist config, auto-restore
+setTimeout(async () => {
+  const token = localStorage.getItem('dashboard_gist_token');
+  const gid = localStorage.getItem('dashboard_gist_id');
+  if (!token || !gid) return; // belum config
+  const lsCount = JSON.parse(localStorage.getItem('dashboard_custom_domains') || '[]').length;
+  if (lsCount > 0) return; // ada data local, no auto-pull
+  console.log('[Gist Auto-Pull] localStorage kosong, fetching dari Gist...');
+  try {
+    const res = await fetch(`https://api.github.com/gists/${gid}`, {
+      headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json' }
+    });
+    if (!res.ok) return;
+    const j = await res.json();
+    const file = j.files[GIST_FILENAME] || Object.values(j.files)[0];
+    if (!file) return;
+    const data = JSON.parse(file.content);
+    if (!data.custom_domains || data.custom_domains.length === 0) return;
+    if (data.custom_domains) localStorage.setItem('dashboard_custom_domains', JSON.stringify(data.custom_domains));
+    if (data.meta) localStorage.setItem('dashboard_meta', JSON.stringify(data.meta));
+    if (data.deleted) localStorage.setItem('dashboard_deleted_domains', JSON.stringify(data.deleted));
+    if (data.blocked) localStorage.setItem('dashboard_blocked_domains', JSON.stringify(data.blocked));
+    if (data.favorites) localStorage.setItem('dashboard_favorites', JSON.stringify(data.favorites));
+    if (data.nawalaHistory) localStorage.setItem('dashboard_nawala_history', JSON.stringify(data.nawalaHistory));
+    if (typeof toast === 'function') toast(`☁️ Auto-restored ${data.custom_domains.length} domain dari Gist. Reloading...`, 'success', 3000);
+    setTimeout(() => location.reload(), 2000);
+  } catch (e) {
+    console.warn('[Gist Auto-Pull] error:', e);
+  }
+}, 2500);
+
 // Blocklist manager — view + restore permanent-deleted domains
 function renderBlocklistUI() {
   const ui = document.getElementById('blocklistUI');
