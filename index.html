@@ -7354,33 +7354,59 @@ async function runAvailCheck() {
   document.getElementById('availProgress').style.display = 'block';
   document.getElementById('availResult').innerHTML = '';
   document.getElementById('availRunBtn').disabled = true;
-  document.getElementById('availRunBtn').textContent = '⏳ Checking...';
+  document.getElementById('availRunBtn').textContent = '⏳ Checking (multi-provider)...';
 
-  const CONCURRENCY = 5;
+  const CONCURRENCY = 3; // lebih konservatif krn multi-fallback per domain
   const queue = [...domains];
   const results = []; // { domain, status }
   let done = 0, available = 0, registered = 0, unknown = 0;
 
-  // Fallback DNS check via Google DoH
-  async function dnsCheck(dom) {
+  // Multi-provider DNS check (Google + Cloudflare + Quad9)
+  async function dnsCheckProvider(dom, providerUrl) {
     try {
       const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 5000);
-      const res = await fetch(`https://dns.google/resolve?name=${encodeURIComponent(dom)}&type=NS`, {
-        signal: ctrl.signal,
-        headers: { 'Accept': 'application/dns-json' }
-      });
+      const timer = setTimeout(() => ctrl.abort(), 6000);
+      const res = await fetch(providerUrl, { signal: ctrl.signal, headers: { 'Accept': 'application/dns-json' } });
       clearTimeout(timer);
       if (!res.ok) return null;
       const j = await res.json();
-      // Status 0 + has NS Answer = registered
       if (j.Status === 0 && j.Answer && j.Answer.length > 0) return 'registered';
-      // Status 3 (NXDOMAIN) = domain doesn't exist = available
       if (j.Status === 3) return 'available';
-      // Status 0 tapi gak ada Answer NS = mungkin registered tapi NS not propagated
       if (j.Status === 0) return 'registered';
       return null;
     } catch { return null; }
+  }
+
+  async function dnsCheckMulti(dom) {
+    // Try multiple DNS providers + multiple record types
+    const providers = [
+      `https://dns.google/resolve?name=${encodeURIComponent(dom)}&type=NS`,
+      `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(dom)}&type=NS`,
+      `https://dns.google/resolve?name=${encodeURIComponent(dom)}&type=A`,
+      `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(dom)}&type=A`,
+      `https://dns.google/resolve?name=${encodeURIComponent(dom)}&type=SOA`,
+    ];
+    for (const url of providers) {
+      const r = await dnsCheckProvider(dom, url);
+      if (r) return r;
+    }
+    return null;
+  }
+
+  // RDAP with retry
+  async function rdapCheck(dom, retries = 2) {
+    for (let i = 0; i < retries; i++) {
+      try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 7000);
+        const res = await fetch(`https://rdap.org/domain/${encodeURIComponent(dom)}`, { redirect: 'follow', signal: ctrl.signal });
+        clearTimeout(timer);
+        if (res.status === 404) return 'available';
+        if (res.ok) return 'registered';
+        if (res.status === 429) await new Promise(r => setTimeout(r, 2000)); // rate limit, wait
+      } catch {}
+    }
+    return null;
   }
 
   async function worker() {
@@ -7388,19 +7414,13 @@ async function runAvailCheck() {
       const dom = queue.shift();
       if (!dom) break;
       let status = 'unknown';
-      // Step 1: try RDAP first
-      try {
-        const ctrl = new AbortController();
-        const timer = setTimeout(() => ctrl.abort(), 6000);
-        const res = await fetch(`https://rdap.org/domain/${encodeURIComponent(dom)}`, { redirect: 'follow', signal: ctrl.signal });
-        clearTimeout(timer);
-        if (res.status === 404) status = 'available';
-        else if (res.ok) status = 'registered';
-      } catch {}
-      // Step 2: fallback ke DNS check kalau RDAP unknown
+      // Step 1: RDAP with retry
+      const rdap = await rdapCheck(dom);
+      if (rdap) status = rdap;
+      // Step 2: fallback DNS multi-provider
       if (status === 'unknown') {
-        const dnsResult = await dnsCheck(dom);
-        if (dnsResult) status = dnsResult;
+        const dns = await dnsCheckMulti(dom);
+        if (dns) status = dns;
       }
       // Tally
       if (status === 'available') available++;
