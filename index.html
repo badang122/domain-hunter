@@ -911,7 +911,7 @@
       <button onclick="openAnalytics();closeSettings();" style="background:linear-gradient(135deg,#06b6d4,#3b82f6);color:white;font-weight:700;padding:10px;">📊 Portfolio Analytics</button>
       <button onclick="bulkAliveCheck();closeSettings();" style="background:linear-gradient(135deg,#0891b2,#0369a1);color:white;font-weight:700;padding:10px;">🟢 Alive Check (Bulk)</button>
       <button onclick="bulkRDAPAge();closeSettings();" style="background:linear-gradient(135deg,#ec4899,#be185d);color:white;font-weight:700;padding:10px;">📅 Fetch Age (RDAP)</button>
-      <button onclick="bulkAvailabilityCheck();closeSettings();" style="background:linear-gradient(135deg,#f97316,#dc2626);color:white;font-weight:700;padding:10px;">🛒 Check Available (Namecheap)</button>
+      <button onclick="openAvailCheck();closeSettings();" style="background:linear-gradient(135deg,#f97316,#dc2626);color:white;font-weight:700;padding:10px;">🛒 Check Available (Namecheap)</button>
     </div>
 
     <h3 style="margin:20px 0 8px;">📜 Aktivitas &amp; 👥 Anggota</h3>
@@ -1602,6 +1602,34 @@ another.org"></textarea>
 .expiry-soon { color:#ef4444;font-weight:700;font-size:11px;margin-left:4px; }
 .expiry-warn { color:#fbbf24;font-size:11px;margin-left:4px; }
 </style>
+
+<!-- ═══ AVAILABILITY CHECK MODAL ═══ -->
+<div class="modal-overlay" id="availCheckModal">
+  <div class="modal" style="width:880px;max-width:96vw;max-height:92vh;overflow-y:auto;">
+    <h2>🛒 Check Domain Available (Namecheap) <button class="close" onclick="closeAvailCheck()">×</button></h2>
+    <div style="background:rgba(245,158,11,0.1);padding:10px;border-radius:8px;border:1px solid rgba(245,158,11,0.3);margin-bottom:14px;font-size:13px;">
+      💡 Paste list domain (1 baris per domain). Akan cek via RDAP — yg available bisa langsung beli di Namecheap.
+    </div>
+    <textarea id="availDomains" rows="10" style="width:100%;font-family:monospace;font-size:13px;"
+              placeholder="example.com
+domain1.com
+domain2.org
+domain3.net
+..."></textarea>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+      <button onclick="availPasteFromClipboard()" style="background:#6366f1;color:white;padding:8px 14px;border:0;border-radius:8px;cursor:pointer;font-weight:700;">📋 Paste Clipboard</button>
+      <button onclick="runAvailCheck()" id="availRunBtn" class="btn-success" style="font-weight:700;padding:8px 14px;">🔍 Check Availability</button>
+      <button onclick="document.getElementById('availDomains').value='';document.getElementById('availResult').innerHTML='';" class="btn-danger">Clear</button>
+    </div>
+    <div id="availProgress" style="margin-top:10px;display:none;">
+      <div style="background:var(--bg);height:8px;border-radius:4px;overflow:hidden;">
+        <div id="availProgressBar" style="background:linear-gradient(90deg,#10b981,#f97316);height:100%;width:0%;transition:width 0.3s;"></div>
+      </div>
+      <div id="availProgressText" style="font-size:12px;color:var(--muted);margin-top:4px;text-align:center;"></div>
+    </div>
+    <div id="availResult" style="margin-top:14px;"></div>
+  </div>
+</div>
 
 <!-- ═══ KANBAN BOARD MODAL ═══ -->
 <div class="modal-overlay" id="kanbanModal">
@@ -7288,6 +7316,122 @@ async function fetchAgeRDAP(domain) {
     const ageYears = Math.floor((Date.now() - regDate) / (365.25 * 86400000));
     return ageYears;
   } catch (e) { return null; }
+}
+
+// ═══ Availability Check Modal — paste domain langsung tanpa nambah ke dashboard ═══
+function openAvailCheck() { document.getElementById('availCheckModal').classList.add('active'); }
+function closeAvailCheck() { document.getElementById('availCheckModal').classList.remove('active'); }
+
+async function availPasteFromClipboard() {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (!text) { toast('Clipboard kosong', 'warn'); return; }
+    document.getElementById('availDomains').value = text;
+    const count = text.split(/\n/).map(s=>s.trim()).filter(Boolean).length;
+    toast(`📋 Pasted ${count} baris`, 'success', 2000);
+  } catch (e) { toast('Gagal paste: ' + e.message, 'error'); }
+}
+
+async function runAvailCheck() {
+  const text = document.getElementById('availDomains').value.trim();
+  if (!text) { toast('Paste domain dulu', 'warn'); return; }
+  // Parse domains (1 per line, or extract domain from any line)
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const domains = [];
+  const seen = new Set();
+  for (const line of lines) {
+    // Extract first domain pattern dari line
+    const m = line.match(/[a-z0-9][-a-z0-9]*\.[a-z]{2,}(?:\.[a-z]{2,})?/i);
+    if (!m) continue;
+    const dom = m[0].toLowerCase().replace(/^www\./, '');
+    if (seen.has(dom)) continue;
+    seen.add(dom);
+    domains.push(dom);
+  }
+  if (domains.length === 0) { toast('Tidak ada domain valid terdeteksi', 'warn'); return; }
+  const total = domains.length;
+
+  document.getElementById('availProgress').style.display = 'block';
+  document.getElementById('availResult').innerHTML = '';
+  document.getElementById('availRunBtn').disabled = true;
+  document.getElementById('availRunBtn').textContent = '⏳ Checking...';
+
+  const CONCURRENCY = 5;
+  const queue = [...domains];
+  const results = []; // { domain, status }
+  let done = 0, available = 0, registered = 0, unknown = 0;
+
+  async function worker() {
+    while (queue.length > 0) {
+      const dom = queue.shift();
+      if (!dom) break;
+      let status = 'unknown';
+      try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 8000);
+        const res = await fetch(`https://rdap.org/domain/${encodeURIComponent(dom)}`, { redirect: 'follow', signal: ctrl.signal });
+        clearTimeout(timer);
+        if (res.status === 404) { status = 'available'; available++; }
+        else if (res.ok) { status = 'registered'; registered++; }
+        else { unknown++; }
+      } catch { unknown++; }
+      results.push({ domain: dom, status });
+      done++;
+      const pct = Math.round((done/total)*100);
+      document.getElementById('availProgressBar').style.width = pct + '%';
+      document.getElementById('availProgressText').textContent = `${done}/${total} (${pct}%) — 🟢 ${available} | 🔴 ${registered} | ⚠️ ${unknown}`;
+      document.title = `🔍 ${done}/${total} · 🟢${available}`;
+    }
+  }
+  await Promise.all(Array.from({length: CONCURRENCY}, worker));
+  document.title = 'Domain Hunter Dashboard';
+  document.getElementById('availRunBtn').disabled = false;
+  document.getElementById('availRunBtn').textContent = '🔍 Check Lagi';
+
+  // Sort: available first
+  results.sort((a,b) => (a.status === 'available' ? -1 : 1) - (b.status === 'available' ? -1 : 1));
+  // Render result table
+  document.getElementById('availResult').innerHTML = `
+    <div style="background:rgba(16,185,129,0.1);padding:10px;border-radius:8px;margin-bottom:10px;font-size:13px;">
+      ✅ Selesai: 🟢 <b>${available} available</b> · 🔴 ${registered} registered · ⚠️ ${unknown} unknown
+    </div>
+    ${available > 0 ? `<button onclick="availImportToDashboard()" class="btn-success" style="margin-bottom:10px;font-weight:700;">📥 Import ${available} Available ke Dashboard</button>` : ''}
+    <div style="max-height:400px;overflow-y:auto;background:var(--bg);border-radius:6px;padding:8px;">
+      <table style="width:100%;font-size:12px;">
+        <thead><tr><th>Domain</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody>${results.map(r => {
+          const badge = r.status === 'available' ? '<span style="background:#10b981;color:white;padding:2px 8px;border-radius:6px;font-size:11px;">🟢 AVAILABLE</span>'
+            : r.status === 'registered' ? '<span style="background:#94a3b8;color:white;padding:2px 8px;border-radius:6px;font-size:11px;">🔴 Registered</span>'
+            : '<span style="background:#f59e0b;color:white;padding:2px 8px;border-radius:6px;font-size:11px;">⚠️ Unknown</span>';
+          const action = r.status === 'available' ? `<a href="https://www.namecheap.com/domains/registration/results/?domain=${encodeURIComponent(r.domain)}" target="_blank" class="btn-success" style="padding:3px 10px;font-size:11px;text-decoration:none;">🛒 Buy</a>` : '';
+          return `<tr><td><b>${r.domain}</b></td><td>${badge}</td><td>${action}</td></tr>`;
+        }).join('')}</tbody>
+      </table>
+    </div>
+  `;
+  // Save results in window for import
+  window._availResults = results;
+}
+
+function availImportToDashboard() {
+  const results = window._availResults || [];
+  const availDomains = results.filter(r => r.status === 'available');
+  if (availDomains.length === 0) { toast('Tidak ada domain available', 'warn'); return; }
+  const custom = JSON.parse(localStorage.getItem('dashboard_custom_domains') || '[]');
+  let added = 0;
+  availDomains.forEach(r => {
+    const dom = r.domain;
+    if (allData.find(x => x.domain === dom) || custom.find(x => x.domain === dom)) return;
+    const entry = { domain: dom, da: 0, pa: 0, ss: 0, dr: 0, ur: 0, age: 0, bl: '', rd: '', goodbl: '', nawala: '', notes: '🛒 Available untuk dibeli', status: 'new', custom: true };
+    custom.unshift(entry);
+    allData.unshift(entry);
+    saveMeta(dom, { availability: 'available', availabilityCheckedAt: new Date().toISOString() });
+    added++;
+  });
+  localStorage.setItem('dashboard_custom_domains', JSON.stringify(custom));
+  toast(`📥 ${added} domain available di-import ke dashboard`, 'success', 4000);
+  closeAvailCheck();
+  applyFilters();
 }
 
 // Bulk Availability Check via RDAP — support up to 500+ domains dengan progress bar
