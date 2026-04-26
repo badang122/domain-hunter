@@ -911,6 +911,7 @@
       <button onclick="openAnalytics();closeSettings();" style="background:linear-gradient(135deg,#06b6d4,#3b82f6);color:white;font-weight:700;padding:10px;">📊 Portfolio Analytics</button>
       <button onclick="bulkAliveCheck();closeSettings();" style="background:linear-gradient(135deg,#0891b2,#0369a1);color:white;font-weight:700;padding:10px;">🟢 Alive Check (Bulk)</button>
       <button onclick="bulkRDAPAge();closeSettings();" style="background:linear-gradient(135deg,#ec4899,#be185d);color:white;font-weight:700;padding:10px;">📅 Fetch Age (RDAP)</button>
+      <button onclick="bulkAvailabilityCheck();closeSettings();" style="background:linear-gradient(135deg,#f97316,#dc2626);color:white;font-weight:700;padding:10px;">🛒 Check Available (Namecheap)</button>
     </div>
 
     <h3 style="margin:20px 0 8px;">📜 Aktivitas &amp; 👥 Anggota</h3>
@@ -2275,7 +2276,8 @@ function render() {
           else if (days <= 90) expBadge = `<span class="expiry-warn" title="Expired dalam ${days} hari">⏰ ${days}d</span>`;
         }
         const aliveDot = meta.aliveStatus === 'alive' ? '<span style="color:#34d399;font-size:12px;margin-right:2px;" title="Alive (cek terakhir)">●</span>' : meta.aliveStatus === 'dead' ? '<span style="color:#ef4444;font-size:12px;margin-right:2px;" title="Dead">●</span>' : '';
-        return `<td>${pin}${aliveDot}<button class="fav-star ${isFav(d.domain)?'active':''}" onclick="toggleFav('${d.domain}')" title="Toggle favorite">${isFav(d.domain)?'⭐':'☆'}</button> <span class="domain" contenteditable="false" onmouseenter="showDomainHover(event,'${d.domain}')" onmouseleave="hideDomainHover()">${d.domain}</span> ${tagChips}${expBadge}</td>`;
+        const availBadge = meta.availability === 'available' ? `<a href="https://www.namecheap.com/domains/registration/results/?domain=${encodeURIComponent(d.domain)}" target="_blank" title="🟢 AVAILABLE — beli di Namecheap" style="background:#10b981;color:white;font-size:9px;padding:1px 5px;border-radius:8px;text-decoration:none;font-weight:700;margin-right:4px;">🛒 Buy</a>` : meta.availability === 'registered' ? '<span style="color:#94a3b8;font-size:10px;margin-right:4px;" title="Registered">🔴</span>' : '';
+        return `<td>${pin}${aliveDot}${availBadge}<button class="fav-star ${isFav(d.domain)?'active':''}" onclick="toggleFav('${d.domain}')" title="Toggle favorite">${isFav(d.domain)?'⭐':'☆'}</button> <span class="domain" contenteditable="false" onmouseenter="showDomainHover(event,'${d.domain}')" onmouseleave="hideDomainHover()">${d.domain}</span> ${tagChips}${expBadge}</td>`;
       })(),
       score: `<td><span class="score ${scoreColor(score)}">${score}</span></td>`,
       status: `<td>${renderStatus(d)}</td>`,
@@ -7286,6 +7288,33 @@ async function fetchAgeRDAP(domain) {
     const ageYears = Math.floor((Date.now() - regDate) / (365.25 * 86400000));
     return ageYears;
   } catch (e) { return null; }
+}
+
+// Bulk Availability Check via RDAP
+async function bulkAvailabilityCheck() {
+  if (allData.length === 0) { toast('Tidak ada domain', 'warn'); return; }
+  if (!confirm(`Cek availability untuk ${allData.length} domain di Namecheap (via RDAP)?`)) return;
+  toast(`🔍 Checking availability untuk ${allData.length} domain...`, 'info', 3000);
+  const CONCURRENCY = 8;
+  const queue = [...allData];
+  let done = 0, available = 0, registered = 0, unknown = 0;
+  async function worker() {
+    while (queue.length > 0) {
+      const d = queue.shift();
+      if (!d) break;
+      try {
+        const res = await fetch(`https://rdap.org/domain/${encodeURIComponent(d.domain)}`, { redirect: 'follow' });
+        if (res.status === 404) { saveMeta(d.domain, { availability: 'available', availabilityCheckedAt: new Date().toISOString() }); available++; }
+        else if (res.ok) { saveMeta(d.domain, { availability: 'registered', availabilityCheckedAt: new Date().toISOString() }); registered++; }
+        else unknown++;
+      } catch { unknown++; }
+      done++;
+    }
+  }
+  await Promise.all(Array.from({length: CONCURRENCY}, worker));
+  toast(`✅ Availability: 🟢 ${available} available, 🔴 ${registered} registered, ⚠️ ${unknown} unknown`, 'success', 7000);
+  if (typeof logActivity === 'function') logActivity('AVAILABILITY_CHECK', `${available} avail, ${registered} reg`);
+  applyFilters();
 }
 
 async function bulkRDAPAge() {
