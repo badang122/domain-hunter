@@ -7460,7 +7460,11 @@ async function runAvailCheck() {
     <div style="background:rgba(16,185,129,0.1);padding:10px;border-radius:8px;margin-bottom:10px;font-size:13px;">
       ✅ Selesai: 🟢 <b>${available} available</b> · 🔴 ${registered} registered · ⚠️ ${unknown} unknown
     </div>
-    ${available > 0 ? `<button onclick="availImportToDashboard()" class="btn-success" style="margin-bottom:10px;font-weight:700;">📥 Import ${available} Available ke Dashboard</button>` : ''}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+      ${available > 0 ? `<button onclick="availImportToDashboard()" class="btn-success" style="font-weight:700;">📥 Import ${available} Available ke Dashboard</button>` : ''}
+      ${unknown > 0 ? `<button onclick="availOpenAllNamecheap('unknown')" class="btn-warn" style="font-weight:700;">🔍 Cek ${unknown} Unknown di Namecheap (max 20 tab)</button>` : ''}
+      ${registered > 0 ? `<button onclick="availOpenAllNamecheap('registered')" style="background:#6366f1;color:white;font-weight:700;padding:8px 14px;border:0;border-radius:8px;cursor:pointer;">🔍 Cek ${registered} Registered di Namecheap (max 20)</button>` : ''}
+    </div>
     <div style="max-height:400px;overflow-y:auto;background:var(--bg);border-radius:6px;padding:8px;">
       <table style="width:100%;font-size:12px;">
         <thead><tr><th>Domain</th><th>Status</th><th>Action</th></tr></thead>
@@ -7468,7 +7472,11 @@ async function runAvailCheck() {
           const badge = r.status === 'available' ? '<span style="background:#10b981;color:white;padding:2px 8px;border-radius:6px;font-size:11px;">🟢 AVAILABLE</span>'
             : r.status === 'registered' ? '<span style="background:#94a3b8;color:white;padding:2px 8px;border-radius:6px;font-size:11px;">🔴 Registered</span>'
             : '<span style="background:#f59e0b;color:white;padding:2px 8px;border-radius:6px;font-size:11px;">⚠️ Unknown</span>';
-          const action = r.status === 'available' ? `<a href="https://www.namecheap.com/domains/registration/results/?domain=${encodeURIComponent(r.domain)}" target="_blank" class="btn-success" style="padding:3px 10px;font-size:11px;text-decoration:none;">🛒 Buy</a>` : '';
+          // Semua status dapat tombol cek Namecheap (Buy / Verify)
+          const ncUrl = `https://www.namecheap.com/domains/registration/results/?domain=${encodeURIComponent(r.domain)}`;
+          const btnLabel = r.status === 'available' ? '🛒 Buy' : r.status === 'registered' ? '🔍 Cek NC' : '🔍 Verify';
+          const btnBg = r.status === 'available' ? '#10b981' : r.status === 'registered' ? '#6366f1' : '#f59e0b';
+          const action = `<a href="${ncUrl}" target="_blank" style="background:${btnBg};color:white;padding:3px 10px;font-size:11px;text-decoration:none;border-radius:6px;font-weight:700;">${btnLabel}</a>`;
           return `<tr><td><b>${r.domain}</b></td><td>${badge}</td><td>${action}</td></tr>`;
         }).join('')}</tbody>
       </table>
@@ -7476,6 +7484,20 @@ async function runAvailCheck() {
   `;
   // Save results in window for import
   window._availResults = results;
+}
+
+// Buka semua domain dengan status tertentu di Namecheap (max 20 tab biar gak crash browser)
+function availOpenAllNamecheap(filterStatus) {
+  const results = window._availResults || [];
+  const targets = results.filter(r => r.status === filterStatus).slice(0, 20);
+  if (targets.length === 0) { toast(`Tidak ada domain ${filterStatus}`, 'warn'); return; }
+  if (!confirm(`Buka ${targets.length} tab Namecheap untuk verify domain ${filterStatus}? (max 20 tab)`)) return;
+  targets.forEach((r, i) => {
+    setTimeout(() => {
+      window.open(`https://www.namecheap.com/domains/registration/results/?domain=${encodeURIComponent(r.domain)}`, '_blank');
+    }, i * 200);
+  });
+  toast(`🔍 Membuka ${targets.length} tab Namecheap...`, 'info', 3000);
 }
 
 function availImportToDashboard() {
