@@ -7361,7 +7361,7 @@ async function runAvailCheck() {
   const results = []; // { domain, status }
   let done = 0, available = 0, registered = 0, unknown = 0;
 
-  // Multi-provider DNS check (Google + Cloudflare + Quad9)
+  // Multi-provider DNS check — CONSERVATIVE (default: registered kalau ada respons)
   async function dnsCheckProvider(dom, providerUrl) {
     try {
       const ctrl = new AbortController();
@@ -7370,26 +7370,34 @@ async function runAvailCheck() {
       clearTimeout(timer);
       if (!res.ok) return null;
       const j = await res.json();
-      if (j.Status === 0 && j.Answer && j.Answer.length > 0) return 'registered';
+      // NXDOMAIN = domain truly tidak ada
       if (j.Status === 3) return 'available';
-      if (j.Status === 0) return 'registered';
+      // Status apapun selain NXDOMAIN = domain ada (registered)
+      // termasuk Status 0 dengan/tanpa Answer, Status 2 (SERVFAIL), Status 5 (REFUSED)
+      if (typeof j.Status === 'number') return 'registered';
       return null;
     } catch { return null; }
   }
 
   async function dnsCheckMulti(dom) {
-    // Try multiple DNS providers + multiple record types
+    // Cek berbagai record type — kalau ada YANG registered di provider manapun, trust itu
     const providers = [
       `https://dns.google/resolve?name=${encodeURIComponent(dom)}&type=NS`,
       `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(dom)}&type=NS`,
+      `https://dns.google/resolve?name=${encodeURIComponent(dom)}&type=SOA`,
+      `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(dom)}&type=SOA`,
       `https://dns.google/resolve?name=${encodeURIComponent(dom)}&type=A`,
       `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(dom)}&type=A`,
-      `https://dns.google/resolve?name=${encodeURIComponent(dom)}&type=SOA`,
+      `https://dns.google/resolve?name=${encodeURIComponent(dom)}&type=MX`,
     ];
+    let nxdomainCount = 0, registeredCount = 0;
     for (const url of providers) {
       const r = await dnsCheckProvider(dom, url);
-      if (r) return r;
+      if (r === 'registered') return 'registered'; // kalau ANY provider bilang registered, trust
+      if (r === 'available') nxdomainCount++;
     }
+    // Hanya jika 4+ provider sepakat NXDOMAIN baru consider available
+    if (nxdomainCount >= 4) return 'available';
     return null;
   }
 
