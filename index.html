@@ -7361,20 +7361,51 @@ async function runAvailCheck() {
   const results = []; // { domain, status }
   let done = 0, available = 0, registered = 0, unknown = 0;
 
+  // Fallback DNS check via Google DoH
+  async function dnsCheck(dom) {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 5000);
+      const res = await fetch(`https://dns.google/resolve?name=${encodeURIComponent(dom)}&type=NS`, {
+        signal: ctrl.signal,
+        headers: { 'Accept': 'application/dns-json' }
+      });
+      clearTimeout(timer);
+      if (!res.ok) return null;
+      const j = await res.json();
+      // Status 0 + has NS Answer = registered
+      if (j.Status === 0 && j.Answer && j.Answer.length > 0) return 'registered';
+      // Status 3 (NXDOMAIN) = domain doesn't exist = available
+      if (j.Status === 3) return 'available';
+      // Status 0 tapi gak ada Answer NS = mungkin registered tapi NS not propagated
+      if (j.Status === 0) return 'registered';
+      return null;
+    } catch { return null; }
+  }
+
   async function worker() {
     while (queue.length > 0) {
       const dom = queue.shift();
       if (!dom) break;
       let status = 'unknown';
+      // Step 1: try RDAP first
       try {
         const ctrl = new AbortController();
-        const timer = setTimeout(() => ctrl.abort(), 8000);
+        const timer = setTimeout(() => ctrl.abort(), 6000);
         const res = await fetch(`https://rdap.org/domain/${encodeURIComponent(dom)}`, { redirect: 'follow', signal: ctrl.signal });
         clearTimeout(timer);
-        if (res.status === 404) { status = 'available'; available++; }
-        else if (res.ok) { status = 'registered'; registered++; }
-        else { unknown++; }
-      } catch { unknown++; }
+        if (res.status === 404) status = 'available';
+        else if (res.ok) status = 'registered';
+      } catch {}
+      // Step 2: fallback ke DNS check kalau RDAP unknown
+      if (status === 'unknown') {
+        const dnsResult = await dnsCheck(dom);
+        if (dnsResult) status = dnsResult;
+      }
+      // Tally
+      if (status === 'available') available++;
+      else if (status === 'registered') registered++;
+      else unknown++;
       results.push({ domain: dom, status });
       done++;
       const pct = Math.round((done/total)*100);
