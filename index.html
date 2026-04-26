@@ -1660,6 +1660,34 @@ domain3.net
   </div>
 </div>
 
+<!-- ═══ AI ASSISTANT FLOATING ═══ -->
+<div id="assistantWidget" style="position:fixed;bottom:24px;right:24px;z-index:997;">
+  <button id="assistantToggle" onclick="toggleAssistant()" title="Asisten Adudu — AI Dashboard"
+    style="width:64px;height:64px;border-radius:14px;border:2px solid #fbbf24;background:linear-gradient(160deg,#22d3ee 0%,#0891b2 60%,#155e75 100%);color:white;cursor:pointer;font-size:32px;box-shadow:0 6px 20px rgba(8,145,178,0.5);transition:transform 0.2s;position:relative;line-height:1;">
+    <span style="filter:drop-shadow(0 1px 2px rgba(0,0,0,0.4));">👽</span>
+    <span style="position:absolute;bottom:-4px;right:-4px;background:#fbbf24;color:#0f172a;font-size:9px;font-weight:900;padding:1px 5px;border-radius:6px;border:1px solid #0f172a;">ADU</span>
+  </button>
+  <div id="assistantPanel" style="display:none;position:absolute;bottom:72px;right:0;width:380px;max-width:92vw;height:500px;background:var(--panel);border:1px solid var(--border);border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,0.5);overflow:hidden;flex-direction:column;">
+    <div style="background:linear-gradient(135deg,#22d3ee,#0891b2,#155e75);padding:12px 14px;display:flex;align-items:center;justify-content:space-between;color:white;">
+      <div style="font-weight:700;display:flex;align-items:center;gap:6px;"><span style="font-size:22px;">👽</span> Asisten Adudu</div>
+      <button onclick="toggleAssistant()" style="background:rgba(255,255,255,0.2);color:white;border:0;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:16px;">×</button>
+    </div>
+    <div id="assistantChat" style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;max-height:400px;"></div>
+    <div style="padding:10px;border-top:1px solid var(--border);">
+      <div style="display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap;">
+        <button onclick="assistantQuick('Tampilkan top 5 domain dengan DA tertinggi')" style="font-size:10px;padding:4px 8px;background:var(--bg-soft);border:1px solid var(--border);border-radius:12px;cursor:pointer;color:var(--text);">💎 Top DA</button>
+        <button onclick="assistantQuick('Domain mana yang akan expired bulan ini?')" style="font-size:10px;padding:4px 8px;background:var(--bg-soft);border:1px solid var(--border);border-radius:12px;cursor:pointer;color:var(--text);">⏰ Expiring</button>
+        <button onclick="assistantQuick('Rekomendasikan 5 domain terbaik untuk dibeli')" style="font-size:10px;padding:4px 8px;background:var(--bg-soft);border:1px solid var(--border);border-radius:12px;cursor:pointer;color:var(--text);">🎯 Rekomendasi</button>
+        <button onclick="assistantQuick('Cara pakai fitur Kanban Board?')" style="font-size:10px;padding:4px 8px;background:var(--bg-soft);border:1px solid var(--border);border-radius:12px;cursor:pointer;color:var(--text);">❓ Help</button>
+      </div>
+      <div style="display:flex;gap:6px;">
+        <input id="assistantInput" placeholder="Tanya apapun tentang domain kamu..." style="flex:1;padding:8px 10px;font-size:13px;" onkeydown="if(event.key==='Enter')assistantAsk()">
+        <button onclick="assistantAsk()" style="background:linear-gradient(135deg,#f093fb,#6366f1);color:white;border:0;border-radius:8px;padding:8px 14px;cursor:pointer;font-weight:700;">Tanya</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ QUICK SCROLL WIDGET ═══ -->
 <div id="quickScroll" style="position:fixed;right:12px;top:50%;transform:translateY(-50%);z-index:900;display:flex;flex-direction:column;gap:6px;align-items:center;">
   <button onclick="scrollToTop()" title="Scroll to Top (PageUp)" style="width:36px;height:36px;border-radius:50%;border:0;background:var(--panel);color:var(--text);cursor:pointer;font-size:16px;box-shadow:0 2px 6px rgba(0,0,0,0.3);transition:all 0.2s;">⬆️</button>
@@ -6958,6 +6986,105 @@ function ssHandleFile(file) {
     document.getElementById('ssPreview').style.display = '';
   };
   reader.readAsDataURL(file);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 🤖 ASISTEN DASHBOARD — AI chat untuk help + analisis domain
+// ═══════════════════════════════════════════════════════════════
+function toggleAssistant() {
+  const panel = document.getElementById('assistantPanel');
+  if (!panel) return;
+  if (panel.style.display === 'none' || !panel.style.display) {
+    panel.style.display = 'flex';
+    if (document.getElementById('assistantChat').children.length === 0) {
+      assistantAddMsg('ai', `**ADU-DU-DU!** 👽\n\nHalo, aku **Adudu**, asisten alien dashboard kamu! Akan kutaklukkan dunia... eh, maksudku, akan kubantu kamu kuasai domain hunting!\n\n💡 Aku bisa:\n• Analisis & rekomendasi domain dari tabelmu\n• Filter domain yang akan expired\n• Tips strategi domain flipping\n• Cara pakai fitur dashboard\n\nKlik shortcut di bawah atau tanya apa saja!`);
+    }
+    setTimeout(() => document.getElementById('assistantInput')?.focus(), 100);
+  } else {
+    panel.style.display = 'none';
+  }
+}
+
+function assistantAddMsg(role, text) {
+  const chat = document.getElementById('assistantChat');
+  if (!chat) return;
+  const msg = document.createElement('div');
+  msg.style.cssText = role === 'user'
+    ? 'align-self:flex-end;background:#6366f1;color:white;padding:8px 12px;border-radius:14px 14px 2px 14px;max-width:80%;font-size:13px;line-height:1.4;'
+    : 'align-self:flex-start;background:var(--bg-soft);color:var(--text);padding:8px 12px;border-radius:14px 14px 14px 2px;max-width:90%;font-size:13px;line-height:1.4;border:1px solid var(--border);';
+  // Simple markdown bold + newline
+  msg.innerHTML = text.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
+  chat.appendChild(msg);
+  chat.scrollTop = chat.scrollHeight;
+  return msg;
+}
+
+function assistantQuick(prompt) {
+  document.getElementById('assistantInput').value = prompt;
+  assistantAsk();
+}
+
+async function assistantAsk() {
+  const input = document.getElementById('assistantInput');
+  const q = input.value.trim();
+  if (!q) return;
+  input.value = '';
+  assistantAddMsg('user', q);
+  const thinking = assistantAddMsg('ai', '⏳ Berpikir...');
+
+  // Build context: dashboard data + user question
+  const meta = JSON.parse(localStorage.getItem('dashboard_meta') || '{}');
+  const summary = {
+    total: allData.length,
+    avgDA: allData.reduce((s,d)=>s+(d.da||0),0)/Math.max(1,allData.length),
+    avgDR: allData.reduce((s,d)=>s+(d.dr||0),0)/Math.max(1,allData.length),
+    expiringSoon: allData.filter(d => {
+      const exp = d.expiryDate || meta[d.domain]?.expiryDate;
+      if (!exp) return false;
+      const days = (new Date(exp) - new Date()) / 86400000;
+      return days >= 0 && days <= 30;
+    }).length,
+  };
+  // Sample 30 domain dengan metric tertinggi (jangan kirim semua, hemat token)
+  const samples = [...allData].sort((a,b) => calcScore(b) - calcScore(a)).slice(0, 30).map(d => ({
+    domain: d.domain, da: d.da, pa: d.pa, dr: d.dr, age: d.age, score: calcScore(d),
+    status: d.status, exp: d.expiryDate || meta[d.domain]?.expiryDate || ''
+  }));
+
+  const ctx = `Kamu Asisten Dashboard Domain Hunter. User ada ${summary.total} domain (avg DA ${summary.avgDA.toFixed(1)}, DR ${summary.avgDR.toFixed(1)}, ${summary.expiringSoon} expiring 30hr).
+
+Top 30 domain (by score):
+${JSON.stringify(samples, null, 1)}
+
+Fitur dashboard: Kanban Board (drag domain antar status), ROI Dashboard (track buy/sell profit), Analytics, Alive Check, Fetch Age (RDAP), Check Available (Namecheap), AI per domain, Cloud Sync via Gist.
+
+Jawab pertanyaan user dalam bahasa Indonesia, ringkas, actionable. Pakai bullet/numbering kalau perlu.
+
+PERTANYAAN: ${q}`;
+
+  try {
+    const userKey = localStorage.getItem('dashboard_gemini_key') || (typeof DEFAULT_API_KEYS !== 'undefined' ? DEFAULT_API_KEYS.gemini : '');
+    let res;
+    const body = JSON.stringify({ contents: [{ parts: [{ text: ctx }] }], generationConfig: { maxOutputTokens: 2048, temperature: 0.4 } });
+    if (userKey) {
+      const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+      for (const m of models) {
+        res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${userKey}`, {
+          method: 'POST', headers: {'Content-Type': 'application/json'}, body
+        });
+        if (res.ok) break;
+      }
+    } else {
+      res = await fetch('/api/gemini', { method: 'POST', headers: {'Content-Type': 'application/json'}, body });
+    }
+    if (!res || !res.ok) throw new Error('AI service error');
+    const j = await res.json();
+    if (j.error) throw new Error(j.error.message);
+    const text = j.candidates?.[0]?.content?.parts?.[0]?.text || '(no response)';
+    thinking.innerHTML = text.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
+  } catch (e) {
+    thinking.innerHTML = `❌ Error: ${e.message}<br><small>Set Gemini API key di Settings → AI dulu.</small>`;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
