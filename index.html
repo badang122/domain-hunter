@@ -906,12 +906,15 @@
 
     <h3 style="margin:20px 0 8px;">🛠️ Tools</h3>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;">
+      <button class="btn-success" onclick="openCharts();closeSettings();" style="font-weight:700;padding:10px;">📊 Grafik (Charts)</button>
+      <button onclick="openLeaderboard();closeSettings();" style="background:linear-gradient(135deg,#fbbf24,#f97316);color:white;font-weight:700;padding:10px;">🏆 Leaderboard</button>
+      <button onclick="openFavorites();closeSettings();" style="background:#fbbf24;color:#1f2937;font-weight:700;padding:10px;">⭐ Favorit</button>
       <button onclick="openKanban();closeSettings();" style="background:linear-gradient(135deg,#8b5cf6,#ec4899);color:white;font-weight:700;padding:10px;">📋 Kanban Board</button>
       <button onclick="openROI();closeSettings();" style="background:linear-gradient(135deg,#10b981,#059669);color:white;font-weight:700;padding:10px;">💰 ROI Dashboard</button>
       <button onclick="openAnalytics();closeSettings();" style="background:linear-gradient(135deg,#06b6d4,#3b82f6);color:white;font-weight:700;padding:10px;">📊 Portfolio Analytics</button>
       <button onclick="bulkAliveCheck();closeSettings();" style="background:linear-gradient(135deg,#0891b2,#0369a1);color:white;font-weight:700;padding:10px;">🟢 Alive Check (Bulk)</button>
       <button onclick="bulkRDAPAge();closeSettings();" style="background:linear-gradient(135deg,#ec4899,#be185d);color:white;font-weight:700;padding:10px;">📅 Fetch Age (RDAP)</button>
-      <button onclick="openAvailCheck();closeSettings();" style="background:linear-gradient(135deg,#f97316,#dc2626);color:white;font-weight:700;padding:10px;">🛒 Check Available (Namecheap)</button>
+      <button onclick="openAvailCheck();closeSettings();" style="background:linear-gradient(135deg,#f97316,#dc2626);color:white;font-weight:700;padding:10px;">🛒 Check Available</button>
     </div>
 
     <h3 style="margin:20px 0 8px;">📜 Aktivitas &amp; 👥 Anggota</h3>
@@ -1767,8 +1770,6 @@ domain3.net
       <div class="user-badge">👤 <span id="currentUser"></span> · <span id="currentRole" style="color:#60a5fa;font-weight:600;"></span></div>
       <button onclick="openSettings()">⚙️ Settings</button>
       <button class="btn-primary" onclick="openAI()">🤖 AI</button>
-      <button class="btn-success" onclick="openCharts()">📊 Charts</button>
-      <button onclick="openLeaderboard()" style="background:linear-gradient(135deg,#fbbf24,#f97316);color:white;font-weight:700;">🏆 Leaderboard</button>
       <div class="import-menu" style="position:relative;display:inline-block;">
         <button onclick="toggleImportMenu(event)" style="background:linear-gradient(135deg,#059669,#3b82f6);color:white;font-weight:700;padding:8px 14px;border:0;border-radius:8px;cursor:pointer;">📥 Import ▼</button>
         <div id="importMenuDropdown" style="display:none;position:absolute;top:100%;left:0;margin-top:4px;background:var(--panel);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.4);z-index:1000;min-width:220px;overflow:hidden;">
@@ -1777,7 +1778,6 @@ domain3.net
           <button onclick="openPasteImport();closeImportMenu();" style="display:block;width:100%;text-align:left;padding:10px 14px;background:transparent;color:var(--text);border:0;cursor:pointer;">📋 Paste Text</button>
         </div>
       </div>
-      <button onclick="openFavorites()" data-i18n="fav">⭐ Fav</button>
       <button onclick="openNawalaDash()" class="btn-danger">🔴 Nawala</button>
       <button id="expiryAlertBtn" onclick="showExpiringDomains()" style="display:none;background:#ef4444;color:white;font-weight:700;">⏰ <span id="expiryCount">0</span></button>
       <button onclick="logout()">Logout</button>
