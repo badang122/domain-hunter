@@ -7600,18 +7600,23 @@ async function runAvailCheck() {
       <table style="width:100%;font-size:12px;">
         <thead><tr><th>Domain</th><th>Status</th><th>Action</th></tr></thead>
         <tbody>${results.map(r => {
-          const badgeStyle = 'cursor:pointer;padding:2px 8px;border-radius:6px;font-size:11px;color:white;user-select:none;';
+          const badgeStyle = 'padding:2px 8px;border-radius:6px;font-size:11px;color:white;user-select:none;display:inline-block;';
           const badge = r.status === 'available'
-            ? `<span onclick="availToggleStatus('${r.domain}')" title="Klik untuk ganti status manual" style="${badgeStyle}background:#10b981;">🟢 AVAILABLE</span>`
+            ? `<span style="${badgeStyle}background:#10b981;">🟢 AVAILABLE</span>`
             : r.status === 'registered'
-              ? `<span onclick="availToggleStatus('${r.domain}')" title="Klik untuk ganti ke Available (manual)" style="${badgeStyle}background:#94a3b8;">🔴 Registered</span>`
-              : `<span onclick="availToggleStatus('${r.domain}')" title="Klik untuk mark Available (setelah verify manual)" style="${badgeStyle}background:#f59e0b;">⚠️ Unknown</span>`;
+              ? `<span style="${badgeStyle}background:#94a3b8;">🔴 Registered</span>`
+              : `<span style="${badgeStyle}background:#f59e0b;">⚠️ Unknown</span>`;
+          const markBtns = `<span style="margin-left:6px;display:inline-flex;gap:2px;">
+            <button onclick="availSetStatus('${r.domain}','available')" title="Mark Available" style="background:${r.status==='available'?'#10b981':'rgba(16,185,129,0.3)'};color:white;border:0;width:22px;height:22px;border-radius:5px;cursor:pointer;font-size:11px;">🟢</button>
+            <button onclick="availSetStatus('${r.domain}','registered')" title="Mark Registered" style="background:${r.status==='registered'?'#94a3b8':'rgba(148,163,184,0.3)'};color:white;border:0;width:22px;height:22px;border-radius:5px;cursor:pointer;font-size:11px;">🔴</button>
+            <button onclick="availSetStatus('${r.domain}','unknown')" title="Mark Unknown" style="background:${r.status==='unknown'?'#f59e0b':'rgba(245,158,11,0.3)'};color:white;border:0;width:22px;height:22px;border-radius:5px;cursor:pointer;font-size:11px;">⚠️</button>
+          </span>`;
           const ncUrl = `https://www.namecheap.com/domains/registration/results/?domain=${encodeURIComponent(r.domain)}`;
           const btnLabel = r.status === 'available' ? '🛒 Buy' : r.status === 'registered' ? '🔍 Cek NC' : '🔍 Verify';
           const btnBg = r.status === 'available' ? '#10b981' : r.status === 'registered' ? '#6366f1' : '#f59e0b';
           const verifyBtn = `<a href="${ncUrl}" target="_blank" style="background:${btnBg};color:white;padding:3px 10px;font-size:11px;text-decoration:none;border-radius:6px;font-weight:700;">${btnLabel}</a>`;
           const copyBtn = `<button onclick="navigator.clipboard.writeText('${r.domain}').then(()=>toast('📋 ${r.domain} copied','success',1500))" style="background:#475569;color:white;padding:3px 8px;font-size:11px;border:0;border-radius:6px;cursor:pointer;font-weight:700;margin-left:4px;" title="Copy domain">📋</button>`;
-          return `<tr><td><input type="checkbox" class="avail-check" data-domain="${r.domain}" data-status="${r.status}" style="margin-right:6px;"><b>${r.domain}</b></td><td>${badge}</td><td>${verifyBtn} ${copyBtn}</td></tr>`;
+          return `<tr><td><input type="checkbox" class="avail-check" data-domain="${r.domain}" data-status="${r.status}" style="margin-right:6px;"><b>${r.domain}</b></td><td>${badge}${markBtns}</td><td>${verifyBtn} ${copyBtn}</td></tr>`;
         }).join('')}</tbody>
       </table>
     </div>
@@ -7620,18 +7625,25 @@ async function runAvailCheck() {
   window._availResults = results;
 }
 
-// Toggle status manual — cycle: unknown → available → registered → unknown
+// Set status manual ke value tertentu untuk DOMAIN tertentu (per-row, tidak affect domain lain)
+function availSetStatus(domain, newStatus) {
+  const results = window._availResults || [];
+  const idx = results.findIndex(r => r.domain === domain);
+  if (idx < 0) return;
+  if (results[idx].status === newStatus) return; // no change
+  results[idx].status = newStatus;
+  results[idx].manualSet = true;
+  toast(`${domain} → ${newStatus}`, 'success', 1500);
+  refreshAvailResultTable(results);
+}
+// Backward compat: cycle (kalau ada code lain yg manggil)
 function availToggleStatus(domain) {
   const results = window._availResults || [];
   const idx = results.findIndex(r => r.domain === domain);
   if (idx < 0) return;
   const cur = results[idx].status;
   const next = cur === 'unknown' ? 'available' : cur === 'available' ? 'registered' : 'unknown';
-  results[idx].status = next;
-  results[idx].manualSet = true;
-  toast(`${domain}: ${cur} → ${next}`, 'info', 1800);
-  // Re-render result table dengan status baru
-  refreshAvailResultTable(results);
+  availSetStatus(domain, next);
 }
 
 function refreshAvailResultTable(results) {
@@ -7661,19 +7673,25 @@ function refreshAvailResultTable(results) {
       <table style="width:100%;font-size:12px;">
         <thead><tr><th>Domain</th><th>Status</th><th>Action</th></tr></thead>
         <tbody>${results.map(r => {
-          const badgeStyle = 'cursor:pointer;padding:2px 8px;border-radius:6px;font-size:11px;color:white;user-select:none;';
+          const badgeStyle = 'padding:2px 8px;border-radius:6px;font-size:11px;color:white;user-select:none;display:inline-block;';
           const manual = r.manualSet ? ' ✏️' : '';
           const badge = r.status === 'available'
-            ? `<span onclick="availToggleStatus('${r.domain}')" title="Klik ganti status" style="${badgeStyle}background:#10b981;">🟢 AVAILABLE${manual}</span>`
+            ? `<span style="${badgeStyle}background:#10b981;">🟢 AVAILABLE${manual}</span>`
             : r.status === 'registered'
-              ? `<span onclick="availToggleStatus('${r.domain}')" title="Klik ganti status" style="${badgeStyle}background:#94a3b8;">🔴 Registered${manual}</span>`
-              : `<span onclick="availToggleStatus('${r.domain}')" title="Klik mark Available" style="${badgeStyle}background:#f59e0b;">⚠️ Unknown</span>`;
+              ? `<span style="${badgeStyle}background:#94a3b8;">🔴 Registered${manual}</span>`
+              : `<span style="${badgeStyle}background:#f59e0b;">⚠️ Unknown</span>`;
+          // Per-row mark buttons: mark available / registered / unknown
+          const markBtns = `<span style="margin-left:6px;display:inline-flex;gap:2px;">
+            <button onclick="availSetStatus('${r.domain}','available')" title="Mark Available" style="background:${r.status==='available'?'#10b981':'rgba(16,185,129,0.3)'};color:white;border:0;width:22px;height:22px;border-radius:5px;cursor:pointer;font-size:11px;">🟢</button>
+            <button onclick="availSetStatus('${r.domain}','registered')" title="Mark Registered" style="background:${r.status==='registered'?'#94a3b8':'rgba(148,163,184,0.3)'};color:white;border:0;width:22px;height:22px;border-radius:5px;cursor:pointer;font-size:11px;">🔴</button>
+            <button onclick="availSetStatus('${r.domain}','unknown')" title="Mark Unknown" style="background:${r.status==='unknown'?'#f59e0b':'rgba(245,158,11,0.3)'};color:white;border:0;width:22px;height:22px;border-radius:5px;cursor:pointer;font-size:11px;">⚠️</button>
+          </span>`;
           const ncUrl = `https://www.namecheap.com/domains/registration/results/?domain=${encodeURIComponent(r.domain)}`;
           const btnLabel = r.status === 'available' ? '🛒 Buy' : r.status === 'registered' ? '🔍 Cek NC' : '🔍 Verify';
           const btnBg = r.status === 'available' ? '#10b981' : r.status === 'registered' ? '#6366f1' : '#f59e0b';
           const verifyBtn = `<a href="${ncUrl}" target="_blank" style="background:${btnBg};color:white;padding:3px 10px;font-size:11px;text-decoration:none;border-radius:6px;font-weight:700;">${btnLabel}</a>`;
           const copyBtn = `<button onclick="navigator.clipboard.writeText('${r.domain}').then(()=>toast('📋 ${r.domain} copied','success',1500))" style="background:#475569;color:white;padding:3px 8px;font-size:11px;border:0;border-radius:6px;cursor:pointer;font-weight:700;margin-left:4px;" title="Copy domain">📋</button>`;
-          return `<tr><td><input type="checkbox" class="avail-check" data-domain="${r.domain}" data-status="${r.status}" style="margin-right:6px;"><b>${r.domain}</b></td><td>${badge}</td><td>${verifyBtn} ${copyBtn}</td></tr>`;
+          return `<tr><td><input type="checkbox" class="avail-check" data-domain="${r.domain}" data-status="${r.status}" style="margin-right:6px;"><b>${r.domain}</b></td><td>${badge}${markBtns}</td><td>${verifyBtn} ${copyBtn}</td></tr>`;
         }).join('')}</tbody>
       </table>
     </div>
