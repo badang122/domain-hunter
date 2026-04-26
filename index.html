@@ -7290,30 +7290,62 @@ async function fetchAgeRDAP(domain) {
   } catch (e) { return null; }
 }
 
-// Bulk Availability Check via RDAP
+// Bulk Availability Check via RDAP — support up to 500+ domains dengan progress bar
 async function bulkAvailabilityCheck() {
   if (allData.length === 0) { toast('Tidak ada domain', 'warn'); return; }
-  if (!confirm(`Cek availability untuk ${allData.length} domain di Namecheap (via RDAP)?`)) return;
-  toast(`🔍 Checking availability untuk ${allData.length} domain...`, 'info', 3000);
-  const CONCURRENCY = 8;
-  const queue = [...allData];
+  // Tanya target: semua atau yg belum
+  const onlyUnchecked = confirm(`Total ${allData.length} domain.\n\n[OK] Cek HANYA yang belum dicek (lebih cepat)\n[Cancel] Cek SEMUA (re-check)`);
+  const targets = onlyUnchecked
+    ? allData.filter(d => {
+        const m = JSON.parse(localStorage.getItem('dashboard_meta') || '{}')[d.domain] || {};
+        return !m.availability;
+      })
+    : [...allData];
+  if (targets.length === 0) { toast('Semua domain sudah dicek', 'success'); return; }
+  const estSec = Math.ceil(targets.length / 5 * 1.5);
+  if (!confirm(`Cek availability ${targets.length} domain via RDAP?\nEstimasi ~${estSec} detik.\nProgress akan tampil di toast/title.`)) return;
+
+  // Progress UI di footer indicator
+  const indicator = document.getElementById('persistIndicator');
+  if (indicator) indicator.style.color = '#fbbf24';
+
+  const CONCURRENCY = 5; // safe rate
+  const queue = [...targets];
   let done = 0, available = 0, registered = 0, unknown = 0;
+  const total = targets.length;
+
   async function worker() {
     while (queue.length > 0) {
       const d = queue.shift();
       if (!d) break;
       try {
-        const res = await fetch(`https://rdap.org/domain/${encodeURIComponent(d.domain)}`, { redirect: 'follow' });
-        if (res.status === 404) { saveMeta(d.domain, { availability: 'available', availabilityCheckedAt: new Date().toISOString() }); available++; }
-        else if (res.ok) { saveMeta(d.domain, { availability: 'registered', availabilityCheckedAt: new Date().toISOString() }); registered++; }
-        else unknown++;
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 8000);
+        const res = await fetch(`https://rdap.org/domain/${encodeURIComponent(d.domain)}`, { redirect: 'follow', signal: ctrl.signal });
+        clearTimeout(timer);
+        if (res.status === 404) {
+          saveMeta(d.domain, { availability: 'available', availabilityCheckedAt: new Date().toISOString() });
+          available++;
+        } else if (res.ok) {
+          saveMeta(d.domain, { availability: 'registered', availabilityCheckedAt: new Date().toISOString() });
+          registered++;
+        } else {
+          unknown++;
+        }
       } catch { unknown++; }
       done++;
+      // Update title biar visible saat tab inactive
+      document.title = `🔍 ${done}/${total} · 🟢${available} 🔴${registered}`;
+      if (indicator) indicator.innerHTML = `🔍 Checking availability... ${done}/${total} (🟢 ${available} 🔴 ${registered} ⚠️ ${unknown})`;
+      // Save partial setiap 20 domain biar gak hilang kalau tab close
+      if (done % 20 === 0) applyFilters();
     }
   }
   await Promise.all(Array.from({length: CONCURRENCY}, worker));
-  toast(`✅ Availability: 🟢 ${available} available, 🔴 ${registered} registered, ⚠️ ${unknown} unknown`, 'success', 7000);
-  if (typeof logActivity === 'function') logActivity('AVAILABILITY_CHECK', `${available} avail, ${registered} reg`);
+  document.title = 'Domain Hunter Dashboard';
+  if (indicator) indicator.style.color = '#34d399';
+  toast(`✅ Selesai cek ${total} domain: 🟢 ${available} available · 🔴 ${registered} registered · ⚠️ ${unknown} unknown`, 'success', 10000);
+  if (typeof logActivity === 'function') logActivity('AVAILABILITY_CHECK', `${available} avail / ${total}`);
   applyFilters();
 }
 
