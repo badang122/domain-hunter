@@ -7462,8 +7462,12 @@ async function runAvailCheck() {
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
       ${available > 0 ? `<button onclick="availImportToDashboard()" class="btn-success" style="font-weight:700;">📥 Import ${available} Available ke Dashboard</button>` : ''}
+      ${available > 0 ? `<button onclick="availCopyByStatus('available')" style="background:#10b981;color:white;font-weight:700;padding:8px 14px;border:0;border-radius:8px;cursor:pointer;">📋 Copy ${available} Available</button>` : ''}
       ${unknown > 0 ? `<button onclick="availOpenAllNamecheap('unknown')" class="btn-warn" style="font-weight:700;">🔍 Cek ${unknown} Unknown di Namecheap (max 20 tab)</button>` : ''}
-      ${registered > 0 ? `<button onclick="availOpenAllNamecheap('registered')" style="background:#6366f1;color:white;font-weight:700;padding:8px 14px;border:0;border-radius:8px;cursor:pointer;">🔍 Cek ${registered} Registered di Namecheap (max 20)</button>` : ''}
+      ${unknown > 0 ? `<button onclick="availCopyByStatus('unknown')" style="background:#f59e0b;color:white;font-weight:700;padding:8px 14px;border:0;border-radius:8px;cursor:pointer;">📋 Copy ${unknown} Unknown</button>` : ''}
+      ${registered > 0 ? `<button onclick="availOpenAllNamecheap('registered')" style="background:#6366f1;color:white;font-weight:700;padding:8px 14px;border:0;border-radius:8px;cursor:pointer;">🔍 Cek ${registered} Registered (max 20)</button>` : ''}
+      ${registered > 0 ? `<button onclick="availCopyByStatus('registered')" style="background:#94a3b8;color:white;font-weight:700;padding:8px 14px;border:0;border-radius:8px;cursor:pointer;">📋 Copy ${registered} Registered</button>` : ''}
+      <button onclick="availCopySelected()" style="background:#475569;color:white;font-weight:700;padding:8px 14px;border:0;border-radius:8px;cursor:pointer;">📋 Copy Selected (centang)</button>
     </div>
     <div style="max-height:400px;overflow-y:auto;background:var(--bg);border-radius:6px;padding:8px;">
       <table style="width:100%;font-size:12px;">
@@ -7472,18 +7476,37 @@ async function runAvailCheck() {
           const badge = r.status === 'available' ? '<span style="background:#10b981;color:white;padding:2px 8px;border-radius:6px;font-size:11px;">🟢 AVAILABLE</span>'
             : r.status === 'registered' ? '<span style="background:#94a3b8;color:white;padding:2px 8px;border-radius:6px;font-size:11px;">🔴 Registered</span>'
             : '<span style="background:#f59e0b;color:white;padding:2px 8px;border-radius:6px;font-size:11px;">⚠️ Unknown</span>';
-          // Semua status dapat tombol cek Namecheap (Buy / Verify)
           const ncUrl = `https://www.namecheap.com/domains/registration/results/?domain=${encodeURIComponent(r.domain)}`;
           const btnLabel = r.status === 'available' ? '🛒 Buy' : r.status === 'registered' ? '🔍 Cek NC' : '🔍 Verify';
           const btnBg = r.status === 'available' ? '#10b981' : r.status === 'registered' ? '#6366f1' : '#f59e0b';
-          const action = `<a href="${ncUrl}" target="_blank" style="background:${btnBg};color:white;padding:3px 10px;font-size:11px;text-decoration:none;border-radius:6px;font-weight:700;">${btnLabel}</a>`;
-          return `<tr><td><b>${r.domain}</b></td><td>${badge}</td><td>${action}</td></tr>`;
+          const verifyBtn = `<a href="${ncUrl}" target="_blank" style="background:${btnBg};color:white;padding:3px 10px;font-size:11px;text-decoration:none;border-radius:6px;font-weight:700;">${btnLabel}</a>`;
+          const copyBtn = `<button onclick="navigator.clipboard.writeText('${r.domain}').then(()=>toast('📋 ${r.domain} copied','success',1500))" style="background:#475569;color:white;padding:3px 8px;font-size:11px;border:0;border-radius:6px;cursor:pointer;font-weight:700;margin-left:4px;" title="Copy domain">📋</button>`;
+          return `<tr><td><input type="checkbox" class="avail-check" data-domain="${r.domain}" data-status="${r.status}" style="margin-right:6px;"><b>${r.domain}</b></td><td>${badge}</td><td>${verifyBtn} ${copyBtn}</td></tr>`;
         }).join('')}</tbody>
       </table>
     </div>
   `;
   // Save results in window for import
   window._availResults = results;
+}
+
+// Copy domain by status — support 'available' / 'registered' / 'unknown'
+function availCopyByStatus(filterStatus) {
+  const results = window._availResults || [];
+  const list = results.filter(r => r.status === filterStatus).map(r => r.domain);
+  if (list.length === 0) { toast(`Tidak ada domain ${filterStatus}`, 'warn'); return; }
+  navigator.clipboard.writeText(list.join('\n')).then(() => {
+    toast(`📋 ${list.length} domain ${filterStatus} di-copy ke clipboard`, 'success', 3500);
+  }).catch(e => toast('Gagal copy: ' + e.message, 'error'));
+}
+// Copy selected (yang di-centang di tabel)
+function availCopySelected() {
+  const checked = document.querySelectorAll('.avail-check:checked');
+  if (checked.length === 0) { toast('Centang domain dulu di tabel', 'warn'); return; }
+  const list = [...checked].map(c => c.dataset.domain);
+  navigator.clipboard.writeText(list.join('\n')).then(() => {
+    toast(`📋 ${list.length} domain selected di-copy`, 'success', 3500);
+  }).catch(e => toast('Gagal copy: ' + e.message, 'error'));
 }
 
 // Buka semua domain dengan status tertentu di Namecheap (max 20 tab biar gak crash browser)
