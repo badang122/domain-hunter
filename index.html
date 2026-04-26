@@ -7413,15 +7413,21 @@ async function runAvailCheck() {
     while (queue.length > 0) {
       const dom = queue.shift();
       if (!dom) break;
+      // Run RDAP + DNS PARALEL untuk akurasi maksimal
+      const [rdap, dns] = await Promise.all([rdapCheck(dom), dnsCheckMulti(dom)]);
       let status = 'unknown';
-      // Step 1: RDAP with retry
-      const rdap = await rdapCheck(dom);
-      if (rdap) status = rdap;
-      // Step 2: fallback DNS multi-provider
-      if (status === 'unknown') {
-        const dns = await dnsCheckMulti(dom);
-        if (dns) status = dns;
-      }
+      // Logic agreement:
+      // - DNS bilang registered → TRUSTED registered (pasti ada record)
+      // - RDAP+DNS sama-sama available → TRUSTED available
+      // - RDAP available tapi DNS registered → konflik, trust DNS = registered
+      // - RDAP registered tapi DNS unknown → registered
+      // - Both unknown → unknown
+      if (dns === 'registered') status = 'registered';
+      else if (rdap === 'registered') status = 'registered';
+      else if (rdap === 'available' && dns === 'available') status = 'available';
+      else if (rdap === 'available' && dns === null) status = 'available'; // DNS no response, trust RDAP 404
+      else if (dns === 'available' && rdap === null) status = 'available';
+      else status = 'unknown';
       // Tally
       if (status === 'available') available++;
       else if (status === 'registered') registered++;
