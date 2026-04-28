@@ -1344,6 +1344,14 @@
       </div>
     </div>
 
+    <!-- Status legend -->
+    <div style="background:rgba(148,163,184,0.08);padding:10px 14px;border-radius:8px;margin-bottom:10px;font-size:12px;color:var(--muted);line-height:1.7;border-left:3px solid #6366f1;">
+      <b style="color:#a5b4fc;">📖 Arti Status:</b>
+      <span style="margin-left:6px;"><b style="color:#34d399;">🟢 Aman</b> = bisa diakses normal di Indonesia</span> ·
+      <span><b style="color:#f87171;">🔴 Terblokir</b> = blokir Nawala/Kominfo</span> ·
+      <span><b style="color:#94a3b8;">❓ Belum</b> = belum dicek (klik badge atau tombol di bawah untuk cek)</span>
+    </div>
+
     <!-- Filter result -->
     <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;flex-wrap:wrap;">
       <strong>Filter:</strong>
@@ -3197,7 +3205,7 @@ function renderNawalaTable() {
       ? '<span class="tag" style="background:rgba(239,68,68,0.2);color:#f87171;">🔴 Terblokir</span>'
       : nw === 'safe'
       ? '<span class="tag" style="background:rgba(16,185,129,0.2);color:#34d399;">🟢 Aman</span>'
-      : '<span class="tag" style="background:rgba(148,163,184,0.2);color:#94a3b8;">❓ Belum</span>';
+      : `<span class="tag" style="background:rgba(148,163,184,0.2);color:#94a3b8;cursor:pointer;border:1px dashed rgba(148,163,184,0.5);" onclick="nwStartRealVerifySingle('${d.domain}')" title="Klik untuk cek di Trust Positif">❓ Belum · klik cek</span>`;
     return `<tr>
       <td class="domain">${d.domain}</td>
       <td>${badge}</td>
