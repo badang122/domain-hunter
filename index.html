@@ -1238,6 +1238,39 @@
   </div>
 </div>
 
+<!-- ═══ TRUST POSITIF REAL VERIFY MODAL ═══ -->
+<div class="modal-overlay" id="nwRealVerifyModal" style="z-index:200;">
+  <div class="modal" style="width:1100px;max-width:97vw;max-height:95vh;display:flex;flex-direction:column;">
+    <h2 style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      🇮🇩 Cek Real di Trust Positif
+      <span id="nwRvProgress" style="font-size:13px;color:var(--muted);font-weight:400;"></span>
+      <button class="close" onclick="closeNwRealVerify()" style="margin-left:auto;">×</button>
+    </h2>
+
+    <div style="background:rgba(239,68,68,0.1);padding:10px 14px;border-radius:8px;border:1px solid rgba(239,68,68,0.3);margin-bottom:12px;font-size:13px;line-height:1.6;">
+      <b>📋 Cara pakai:</b> Iframe di bawah load langsung dari <code>trustpositif.komdigi.go.id</code> — itu data resmi Kominfo.
+      Lihat hasilnya, lalu klik tombol <b style="color:#34d399;">🟢 Aman</b> atau <b style="color:#f87171;">🔴 Blokir</b> di bawah.
+      Kalau iframe gagal load (X-Frame block), klik <b>🪟 Buka di Tab Baru</b>.
+    </div>
+
+    <div id="nwRvCurrentDomain" style="background:rgba(99,102,241,0.15);padding:14px;border-radius:10px;margin-bottom:10px;font-size:18px;font-weight:700;text-align:center;border:1px solid rgba(99,102,241,0.4);">
+      —
+    </div>
+
+    <iframe id="nwRvIframe" src="about:blank"
+            style="flex:1;width:100%;min-height:380px;border:1px solid var(--border);border-radius:10px;background:#fff;"
+            sandbox="allow-same-origin allow-scripts allow-forms allow-popups">
+    </iframe>
+
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center;">
+      <button class="btn-success" onclick="nwRvMark('safe')" style="font-weight:700;padding:12px 20px;font-size:14px;flex:1;min-width:160px;">🟢 Aman (tidak diblokir)</button>
+      <button class="btn-danger" onclick="nwRvMark('blocked')" style="font-weight:700;padding:12px 20px;font-size:14px;flex:1;min-width:160px;">🔴 Blokir (Nawala)</button>
+      <button onclick="nwRvSkip()" style="background:#475569;color:white;font-weight:700;padding:12px 16px;border:0;border-radius:8px;cursor:pointer;">⏭ Skip</button>
+      <button onclick="nwRvOpenInNewTab()" title="Buka di tab baru" style="background:#6366f1;color:white;font-weight:700;padding:12px 16px;border:0;border-radius:8px;cursor:pointer;">🪟 Tab Baru</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ NAWALA DASHBOARD MODAL ═══ -->
 <div class="modal-overlay" id="nawalaDashModal">
   <div class="modal" style="width:1000px;max-width:96vw;max-height:92vh;overflow-y:auto;">
@@ -1286,6 +1319,7 @@
         <button onclick="nwLoadAllDomains()">📥 Load dari Tabel Utama</button>
         <button onclick="nwRecheckAll()">🔄 Recheck Semua</button>
         <button class="btn-warn" onclick="nwBulkOpenTabs()" title="Buka semua domain di Trust Positif (max 20)">🪟 Buka 20 Tab</button>
+        <button onclick="nwStartRealVerify()" style="background:linear-gradient(135deg,#dc2626,#7f1d1d);color:white;font-weight:700;padding:8px 14px;border:0;border-radius:8px;cursor:pointer;" title="Cek di trustpositif.komdigi.go.id langsung via iframe + tandai per domain">🇮🇩 Real Verify (Trust Positif Asli)</button>
       </div>
       <div style="margin-top:10px;padding:10px;background:linear-gradient(90deg,rgba(239,68,68,0.15),rgba(245,158,11,0.1));border:1px solid rgba(239,68,68,0.4);border-radius:8px;">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
@@ -3170,7 +3204,8 @@ function renderNawalaTable() {
       <td style="color:var(--muted);font-size:12px;">${when}</td>
       <td style="white-space:nowrap;">
           <button class="check-link" style="background:#3b82f6;color:white;padding:3px 8px;" onclick="nwCheckOne('${d.domain}')" title="Cek auto">🔄</button>
-          <a class="check-link nw" href="https://trustpositif.komdigi.go.id/?trpdomain=${encodeURIComponent(d.domain)}" target="_blank" title="Buka Trust Positif">🔗</a>
+          <button class="check-link" style="background:#dc2626;color:white;padding:3px 8px;" onclick="nwStartRealVerifySingle('${d.domain}')" title="Cek Real di Trust Positif (iframe)">🇮🇩</button>
+          <a class="check-link nw" href="https://trustpositif.komdigi.go.id/?trpdomain=${encodeURIComponent(d.domain)}" target="_blank" title="Buka Trust Positif di tab baru">🔗</a>
           <button class="check-link" style="background:#10b981;color:white;padding:3px 8px;" onclick="nwMark('${d.domain}','safe')" title="Tandai AMAN">🟢</button>
           <button class="check-link" style="background:#ef4444;color:white;padding:3px 8px;" onclick="nwMark('${d.domain}','blocked')" title="Tandai BLOKIR">🔴</button>
       </td>
@@ -3208,6 +3243,92 @@ function nwOpenTrustPositif() {
   const d = document.getElementById('nwSingleDomain').value.trim().toLowerCase();
   if (!d) return alert('Masukkan domain dulu');
   window.open(`https://trustpositif.komdigi.go.id/?trpdomain=${encodeURIComponent(d)}`, '_blank');
+}
+
+// ════════════════════════════════════════════════════════════════
+// 🇮🇩 REAL VERIFY MODE — load trustpositif.komdigi.go.id via iframe
+// ════════════════════════════════════════════════════════════════
+let _nwRvQueue = [];
+let _nwRvCurrent = null;
+let _nwRvTotal = 0;
+
+function nwStartRealVerifySingle(domain) {
+  _nwRvQueue = [domain];
+  _nwRvTotal = 1;
+  nwRvNext();
+}
+
+function nwStartRealVerify() {
+  // Bulk: ambil dari hasil Nawala dashboard yang masih unchecked atau dari domain di textarea
+  const ta = document.getElementById('nwBulkDomains').value.trim();
+  let queue = [];
+  if (ta) {
+    queue = ta.split(/\r?\n/).map(s => s.trim().toLowerCase().replace(/^https?:\/\//,'').replace(/^www\./,'').split('/')[0]).filter(Boolean);
+  } else {
+    // Default: ambil dari tabel Nawala yang belum dicek
+    const data = (typeof allData !== 'undefined' && allData.length) ? allData : getAllDomainsForAI();
+    const meta = JSON.parse(localStorage.getItem('dashboard_meta') || '{}');
+    queue = data.filter(d => {
+      const nw = (meta[d.domain] || {}).nawala || d.nawala;
+      return !nw || nw === 'unchecked';
+    }).map(d => d.domain);
+  }
+  if (queue.length === 0) {
+    toast('Tidak ada domain untuk diverifikasi (paste di textarea atau load dari tabel)', 'warn', 4000);
+    return;
+  }
+  if (!confirm(`🇮🇩 Real Verify ${queue.length} domain via Trust Positif (iframe)?\n\nKamu akan lihat hasil resmi Kominfo per domain → tandai Aman/Blokir.\n\nLanjut?`)) return;
+  _nwRvQueue = queue;
+  _nwRvTotal = queue.length;
+  nwRvNext();
+}
+
+function nwRvNext() {
+  if (_nwRvQueue.length === 0) {
+    closeNwRealVerify();
+    toast(`✅ Selesai Real Verify ${_nwRvTotal} domain`, 'success', 4000);
+    if (typeof renderNawalaTable === 'function') renderNawalaTable();
+    if (typeof updateNawalaStats === 'function') updateNawalaStats();
+    return;
+  }
+  _nwRvCurrent = _nwRvQueue.shift();
+  const idx = _nwRvTotal - _nwRvQueue.length;
+  document.getElementById('nwRvCurrentDomain').innerHTML = `<span style="color:#a5b4fc;font-size:13px;">${idx}/${_nwRvTotal}</span> · <span style="color:#fbbf24;">${_nwRvCurrent}</span>`;
+  document.getElementById('nwRvProgress').textContent = `· ${idx} dari ${_nwRvTotal}`;
+  document.getElementById('nwRvIframe').src = `https://trustpositif.komdigi.go.id/?trpdomain=${encodeURIComponent(_nwRvCurrent)}`;
+  document.getElementById('nwRealVerifyModal').classList.add('active');
+}
+
+function nwRvMark(status) {
+  if (!_nwRvCurrent) return;
+  if (typeof nwMark === 'function') {
+    nwMark(_nwRvCurrent, status);
+  } else {
+    // Fallback: save langsung ke meta
+    const meta = JSON.parse(localStorage.getItem('dashboard_meta') || '{}');
+    meta[_nwRvCurrent] = {...(meta[_nwRvCurrent] || {}), nawala: status, nawalaCheckedAt: new Date().toISOString(), nawalaSource: 'trustpositif-real'};
+    localStorage.setItem('dashboard_meta', JSON.stringify(meta));
+  }
+  toast(`${status === 'safe' ? '🟢 Aman' : '🔴 Blokir'}: ${_nwRvCurrent}`, status === 'safe' ? 'success' : 'error', 1500);
+  setTimeout(nwRvNext, 400);
+}
+
+function nwRvSkip() {
+  toast(`⏭ Skip ${_nwRvCurrent}`, 'info', 1000);
+  setTimeout(nwRvNext, 200);
+}
+
+function nwRvOpenInNewTab() {
+  if (!_nwRvCurrent) return;
+  window.open(`https://trustpositif.komdigi.go.id/?trpdomain=${encodeURIComponent(_nwRvCurrent)}`, '_blank');
+}
+
+function closeNwRealVerify() {
+  document.getElementById('nwRealVerifyModal').classList.remove('active');
+  document.getElementById('nwRvIframe').src = 'about:blank'; // stop loading
+  _nwRvCurrent = null;
+  _nwRvQueue = [];
+  _nwRvTotal = 0;
 }
 
 // Buka max 20 tab Trust Positif sekaligus
