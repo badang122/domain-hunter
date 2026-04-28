@@ -1907,67 +1907,45 @@ domain3.net
       <span style="font-size:11px;color:var(--muted);">Wajib: <b style="color:#a78bfa;">Domain</b> · sisanya opsional</span>
     </div>
 
-    <div class="add-form-row" style="align-items:flex-start;">
-
-      <!-- Section 1: Domain Info -->
-      <div class="form-section basic">
-        <div class="form-section-title"><span class="dot"></span>📝 Info Domain</div>
-        <div class="form-section-grid">
-          <div style="flex:2;min-width:260px;">
-            <label class="field-label"><span class="field-icon" style="background:#6366f1;">🌐</span> Domain</label>
-            <input id="newDomain" type="text" placeholder="contoh: example.com" style="width:100%;">
-          </div>
-          <div>
-            <label class="field-label"><span class="field-icon" style="background:#ec4899;">📅</span> Umur (tahun)</label>
-            <div style="display:flex;gap:4px;">
-              <input id="newAge" type="text" placeholder="contoh: 5" style="width:90px;" title="Tahun atau — (dash) jika tidak tahu">
-              <button type="button" onclick="document.getElementById('newAge').value='—'" title="Tidak tahu umur" style="padding:8px 10px;background:#374151;color:#fff;border:1px solid rgba(255,255,255,0.1);border-radius:8px;cursor:pointer;font-weight:700;">—</button>
-            </div>
-          </div>
-        </div>
-        <div class="form-section-hint">💡 Domain auto-fill umur via RDAP setelah ditambahkan.</div>
+    <div class="add-form-row" style="align-items:flex-end;gap:8px;">
+      <div style="flex:1.5;min-width:200px;">
+        <label class="field-label"><span class="field-icon" style="background:#6366f1;">🌐</span> Domain</label>
+        <input id="newDomain" type="text" placeholder="example.com" style="width:100%;">
       </div>
-
-      <!-- Section 2: Moz Metrics -->
-      <div class="form-section moz">
-        <div class="form-section-title"><span class="dot"></span>📊 Moz Metrics <span style="font-weight:500;text-transform:none;color:var(--muted);font-size:11px;letter-spacing:0;">— dari DAPAChecker</span></div>
-        <div class="form-section-grid">
-          <div>
-            <label class="field-label"><span class="field-icon" style="background:#3b82f6;">DA</span> Domain Auth</label>
-            <input id="newDA" type="number" min="0" placeholder="0-100" style="width:100px;">
-          </div>
-          <div>
-            <label class="field-label"><span class="field-icon" style="background:#3b82f6;">PA</span> Page Auth</label>
-            <input id="newPA" type="number" min="0" placeholder="0-100" style="width:100px;">
-          </div>
-          <div>
-            <label class="field-label"><span class="field-icon" style="background:#f59e0b;">SS</span> Spam Score</label>
-            <input id="newSS" type="number" min="0" placeholder="0-100 (%)" style="width:110px;">
-          </div>
+      <div>
+        <label class="field-label"><span class="field-icon" style="background:#ec4899;">📅</span> Umur</label>
+        <div style="display:flex;gap:3px;">
+          <input id="newAge" type="text" placeholder="thn" style="width:55px;" title="Tahun atau — jika tidak tahu">
+          <button type="button" onclick="document.getElementById('newAge').value='—'" title="Tidak tahu umur" style="padding:8px 8px;background:#374151;color:#fff;border:1px solid rgba(255,255,255,0.1);border-radius:8px;cursor:pointer;font-weight:700;">—</button>
         </div>
       </div>
-
-      <!-- Section 3: Ahrefs Metrics -->
-      <div class="form-section ahrefs">
-        <div class="form-section-title"><span class="dot"></span>🔶 Ahrefs Metrics <span style="font-weight:500;text-transform:none;color:var(--muted);font-size:11px;letter-spacing:0;">— dari Ahrefs Backlink Checker</span></div>
-        <div class="form-section-grid">
-          <div>
-            <label class="field-label"><span class="field-icon" style="background:#10b981;">DR</span> Domain Rating</label>
-            <input id="newDR" type="number" min="0" placeholder="0-100" style="width:100px;">
-          </div>
-          <div>
-            <label class="field-label"><span class="field-icon" style="background:#10b981;">UR</span> URL Rating</label>
-            <input id="newUR" type="number" min="0" placeholder="0-100" style="width:100px;">
-          </div>
-          <div>
-            <label class="field-label"><span class="field-icon" style="background:#8b5cf6;">BL</span> Backlinks</label>
-            <input id="newBL" type="text" placeholder="contoh: 307K" style="width:120px;">
-          </div>
-          <div>
-            <label class="field-label"><span class="field-icon" style="background:#06b6d4;">RD</span> Rating Domain</label>
-            <input id="newRD" type="text" placeholder="angka cepat" style="width:120px;" title="Angka cepat (450). Untuk daftar lengkap, isi textarea di bawah.">
-          </div>
-        </div>
+      <div>
+        <label class="field-label"><span class="field-icon" style="background:#3b82f6;">DA</span> Domain Auth</label>
+        <input id="newDA" type="number" min="0" placeholder="0-100" style="width:75px;">
+      </div>
+      <div>
+        <label class="field-label"><span class="field-icon" style="background:#3b82f6;">PA</span> Page Auth</label>
+        <input id="newPA" type="number" min="0" placeholder="0-100" style="width:75px;">
+      </div>
+      <div>
+        <label class="field-label"><span class="field-icon" style="background:#f59e0b;">SS</span> Spam %</label>
+        <input id="newSS" type="number" min="0" placeholder="0-100" style="width:75px;">
+      </div>
+      <div>
+        <label class="field-label"><span class="field-icon" style="background:#10b981;">DR</span> Dom Rating</label>
+        <input id="newDR" type="number" min="0" placeholder="0-100" style="width:75px;">
+      </div>
+      <div>
+        <label class="field-label"><span class="field-icon" style="background:#10b981;">UR</span> URL Rating</label>
+        <input id="newUR" type="number" min="0" placeholder="0-100" style="width:75px;">
+      </div>
+      <div>
+        <label class="field-label"><span class="field-icon" style="background:#8b5cf6;">BL</span> Backlinks</label>
+        <input id="newBL" type="text" placeholder="307K" style="width:90px;">
+      </div>
+      <div>
+        <label class="field-label"><span class="field-icon" style="background:#06b6d4;">RD</span> Rating Dom</label>
+        <input id="newRD" type="text" placeholder="angka" style="width:80px;" title="Angka cepat (450). Daftar lengkap → textarea bawah.">
       </div>
 
       <!-- Section 4: Good Backlink (full list) -->
