@@ -1676,6 +1676,44 @@ another.org"></textarea>
 </div>
 
 <!-- ═══ AVAILABILITY CHECK MODAL ═══ -->
+<!-- Cloud Sync Quick Modal -->
+<div class="modal-overlay" id="cloudSyncQuickModal">
+  <div class="modal" style="width:520px;max-width:95vw;">
+    <h2 style="display:flex;align-items:center;gap:10px;">
+      <span style="background:linear-gradient(135deg,#06b6d4,#0891b2);color:#fff;width:32px;height:32px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;">☁️</span>
+      Cloud Sync
+      <button class="close" onclick="closeCloudSyncQuick()" style="margin-left:auto;">×</button>
+    </h2>
+
+    <div style="background:rgba(6,182,212,0.08);padding:12px;border-radius:10px;border:1px solid rgba(6,182,212,0.3);margin-bottom:14px;font-size:13px;">
+      Sync data dashboard ke <b>private GitHub Gist</b> biar bisa diakses dari device manapun. Otomatis aktif — tinggal pakai.
+    </div>
+
+    <div id="cloudSyncQuickStatus" style="margin-bottom:14px;padding:12px;background:rgba(255,255,255,0.04);border-radius:10px;font-size:13px;line-height:1.7;">
+      <div>📊 Loading status...</div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <button onclick="cloudSyncQuickPush()" class="btn-success" style="padding:12px;font-weight:700;font-size:14px;">⬆️ Push Sekarang<br><span style="font-size:10px;font-weight:400;opacity:0.85;">upload data → Gist</span></button>
+      <button onclick="cloudSyncQuickPull()" class="btn-warn" style="padding:12px;font-weight:700;font-size:14px;">⬇️ Pull Sekarang<br><span style="font-size:10px;font-weight:400;opacity:0.85;">ambil data ← Gist</span></button>
+    </div>
+
+    <label style="display:flex;align-items:center;gap:8px;padding:10px;background:rgba(255,255,255,0.04);border-radius:8px;cursor:pointer;">
+      <input type="checkbox" id="cloudSyncQuickAutosync" onchange="cloudSyncQuickToggleAutosync(this.checked)">
+      <span style="font-size:13px;font-weight:600;">🔄 Auto-sync setiap perubahan (debounce 8s)</span>
+    </label>
+
+    <details style="margin-top:14px;">
+      <summary style="cursor:pointer;font-size:12px;color:var(--muted);">⚙️ Advanced (Gist ID, token)</summary>
+      <div style="margin-top:8px;padding:10px;background:rgba(0,0,0,0.2);border-radius:8px;font-family:monospace;font-size:11px;line-height:1.6;">
+        <div>Gist ID: <span id="cloudSyncQuickGid" style="color:#67e8f9;">—</span></div>
+        <div>Token: <span id="cloudSyncQuickToken" style="color:#67e8f9;">—</span></div>
+        <div style="margin-top:8px;color:var(--muted);">Edit di Settings → ☁️ Cloud Sync (GitHub Gist)</div>
+      </div>
+    </details>
+  </div>
+</div>
+
 <div class="modal-overlay" id="availCheckModal">
   <div class="modal" style="width:880px;max-width:96vw;max-height:92vh;overflow-y:auto;">
     <h2>🛒 Check Domain Available (Namecheap) <button class="close" onclick="closeAvailCheck()">×</button></h2>
@@ -1887,6 +1925,7 @@ domain3.net
     <a href="https://trustpositif.komdigi.go.id/" target="_blank" class="quick-link nawala">🔴 Trust Positif</a>
     <a href="javascript:void(0)" onclick="openAvailCheck()" class="quick-link namecheap" style="border-left:3px solid #f97316;">🛒 Check Available</a>
     <a href="javascript:void(0)" onclick="openNawalaDash()" class="quick-link nawala" style="border-left:3px solid #ef4444;">🔴 Nawala</a>
+    <a href="javascript:void(0)" onclick="openCloudSyncQuick()" class="quick-link" style="border-left:3px solid #06b6d4;background:linear-gradient(135deg,rgba(6,182,212,0.15),rgba(8,145,178,0.1));">☁️ Cloud Sync</a>
   </div>
 
   <div class="stats" id="stats">
@@ -3784,6 +3823,49 @@ async function gistPullNow() {
     updateGistStatus(`❌ Error: ${e.message}`, '#ef4444');
     toast('Gist pull error: ' + e.message, 'error', 4000);
   }
+}
+
+// ─── Cloud Sync Quick Modal (dari quick-link "☁️ Cloud Sync") ───
+function openCloudSyncQuick() {
+  cloudSyncQuickRefresh();
+  document.getElementById('cloudSyncQuickModal').classList.add('active');
+}
+function closeCloudSyncQuick() {
+  document.getElementById('cloudSyncQuickModal').classList.remove('active');
+}
+function cloudSyncQuickRefresh() {
+  const token = localStorage.getItem('dashboard_gist_token') || '';
+  const gid = localStorage.getItem('dashboard_gist_id') || '';
+  const auto = localStorage.getItem('dashboard_gist_autosync') === '1';
+  const lastSync = parseInt(localStorage.getItem('dashboard_gist_lastsync') || '0');
+  const count = JSON.parse(localStorage.getItem('dashboard_custom_domains') || '[]').length;
+
+  const tokenMask = token ? (token.slice(0,6) + '••••••' + token.slice(-4)) : '(belum di-set)';
+  const gidShort = gid ? (gid.slice(0,8) + '...' + gid.slice(-4)) : '(belum di-set)';
+  const lastSyncStr = lastSync ? new Date(lastSync).toLocaleString('id-ID') : 'belum pernah sync';
+
+  document.getElementById('cloudSyncQuickStatus').innerHTML = `
+    <div>📦 Domain di local: <b style="color:#67e8f9;">${count}</b></div>
+    <div>🕒 Sync terakhir: <b>${lastSyncStr}</b></div>
+    <div>🔄 Auto-sync: <b style="color:${auto?'#34d399':'#f59e0b'};">${auto?'AKTIF':'NONAKTIF'}</b></div>
+    <div>${token && gid ? '✅ Config OK — siap sync cross-device' : '⚠️ Config belum lengkap, set di Settings'}</div>
+  `;
+  document.getElementById('cloudSyncQuickAutosync').checked = auto;
+  document.getElementById('cloudSyncQuickGid').textContent = gidShort;
+  document.getElementById('cloudSyncQuickToken').textContent = tokenMask;
+}
+async function cloudSyncQuickPush() {
+  await gistPushNow();
+  cloudSyncQuickRefresh();
+}
+async function cloudSyncQuickPull() {
+  await gistPullNow();
+  // gistPullNow akan reload page kalau sukses
+}
+function cloudSyncQuickToggleAutosync(on) {
+  localStorage.setItem('dashboard_gist_autosync', on ? '1' : '');
+  toast(on ? '🔄 Auto-sync diaktifkan' : '⏸ Auto-sync dimatikan', 'success', 2000);
+  cloudSyncQuickRefresh();
 }
 
 // Auto-sync: debounced push after changes
