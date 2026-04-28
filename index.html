@@ -4022,17 +4022,28 @@ async function openProfileMenu() {
   const role = session.role || '—';
   if (!user || user === '—') { toast('Session tidak ditemukan, login ulang', 'error'); return; }
 
-  // Re-auth: minta password login dulu sebelum buka menu Akun (security gate)
-  const pwd = prompt(`🔐 Konfirmasi identitas\n\nMasukkan password login ${user} untuk buka menu Akun:`);
+  // Re-auth: terima salah satu — password login ATAU Admin Master Password
+  const pwd = prompt(
+    `🔐 Konfirmasi identitas\n\n` +
+    `Masukkan SALAH SATU password berikut:\n` +
+    `  • Password login akun "${user}"\n` +
+    (role === 'admin' ? `  • ATAU Admin Master Password\n` : ``) +
+    `\n(Hanya untuk verifikasi sebelum buka menu Akun)`
+  );
   if (pwd === null) return; // user cancel
   if (!pwd) { toast('Password kosong', 'warn'); return; }
 
   const members = JSON.parse(localStorage.getItem('dashboard_members') || '[]');
   const me = members.find(m => m.username === user);
   if (!me) { toast('User tidak ditemukan di members', 'error'); return; }
+
   const h = await hashPwd(pwd);
-  if (h !== me.password) {
-    toast('❌ Password salah', 'error', 4000);
+  const adminMaster = localStorage.getItem('dashboard_admin_master_pwd');
+  const loginOk = (h === me.password);
+  const masterOk = (role === 'admin' && adminMaster && h === adminMaster);
+
+  if (!loginOk && !masterOk) {
+    toast('❌ Password salah (coba login pass atau admin master pass)', 'error', 5000);
     if (typeof logActivity === 'function') logActivity('FAILED_PROFILE_AUTH', user);
     return;
   }
