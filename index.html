@@ -3952,12 +3952,12 @@ async function initAuth() {
 }
 
 async function resetAdmin() {
-  if (!confirm('Reset semua member & password ke default (admin/Saturnus11)?')) return;
+  if (!confirm('Reset semua member & password ke default (admin/1901Fcbarcelona)?')) return;
   localStorage.removeItem('dashboard_members');
   localStorage.removeItem('dashboard_session');
-  const members = [{ username: 'admin', password: await hashPass('Saturnus11'), role: 'admin', created: new Date().toISOString().split('T')[0] }];
+  const members = [{ username: 'admin', password: await hashPass('1901Fcbarcelona'), role: 'admin', created: new Date().toISOString().split('T')[0] }];
   localStorage.setItem('dashboard_members', JSON.stringify(members));
-  toast('Reset done! Login: admin / Saturnus11', 'success');
+  toast('Reset done! Login: admin / 1901Fcbarcelona', 'success');
   location.reload();
 }
 
@@ -4729,11 +4729,11 @@ const DEFAULT_PROVIDER = 'groq';
 // Generate hash: https://emn178.github.io/online-tools/sha256.html
 // ═══════════════════════════════════════════════════════════════
 // Pre-hashed passwords:
-// admin / Saturnus11 = 6d87d87a2485bd7b68aa5e9db1b4aef56a44c4b82e3a14a4984006b6a50fddc2
-// user_01 / user123  = c982103c72fb7cc02ffa506f2f7bf40955e3ed4af622c6200e7bd8bca31cf288
-// user_02 / user123  = (same password)
+// admin / 1901Fcbarcelona = a9243ce862b6a217844c8bba48c087bd9ab741bb28a8a20c3b778e72707f7282
+// user_01 / user123       = c982103c72fb7cc02ffa506f2f7bf40955e3ed4af622c6200e7bd8bca31cf288
+// user_02 / user123       = (same password)
 const DEFAULT_MEMBERS = [
-  { username: 'admin',   password: '6d87d87a2485bd7b68aa5e9db1b4aef56a44c4b82e3a14a4984006b6a50fddc2', role: 'admin', created: '2026-04-17' },
+  { username: 'admin',   password: 'a9243ce862b6a217844c8bba48c087bd9ab741bb28a8a20c3b778e72707f7282', role: 'admin', created: '2026-04-17' },
   { username: 'user_01', password: 'c982103c72fb7cc02ffa506f2f7bf40955e3ed4af622c6200e7bd8bca31cf288', role: 'user',  created: '2026-04-17' },
   { username: 'user_02', password: 'c982103c72fb7cc02ffa506f2f7bf40955e3ed4af622c6200e7bd8bca31cf288', role: 'user',  created: '2026-04-17' },
   { username: 'viewer',  password: 'c982103c72fb7cc02ffa506f2f7bf40955e3ed4af622c6200e7bd8bca31cf288', role: 'user',  created: '2026-04-17' },
@@ -4752,7 +4752,7 @@ function initDefaultKeys() {
 
   // FORCE SYNC default members — update password hash yang salah di localStorage
   // Pakai versi tag agar update paksa setiap rilis baru
-  const MEMBERS_VERSION = 'v2-2026-04-17';
+  const MEMBERS_VERSION = 'v3-2026-04-28-pwd-rotate';
   const savedVersion = localStorage.getItem('dashboard_members_version');
   let existing = JSON.parse(localStorage.getItem('dashboard_members') || '[]');
 
