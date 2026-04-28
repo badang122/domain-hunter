@@ -1604,6 +1604,35 @@ another.org"></textarea>
 .expiry-warn { color:#fbbf24;font-size:11px;margin-left:4px; }
 </style>
 
+<!-- ═══ PROFILE MENU MODAL ═══ -->
+<div class="modal-overlay" id="profileMenuModal">
+  <div class="modal" style="width:480px;max-width:95vw;">
+    <h2>👤 Akun <button class="close" onclick="closeProfileMenu()">×</button></h2>
+    <div style="background:var(--bg-soft);padding:14px;border-radius:10px;margin-bottom:16px;">
+      <div style="font-size:13px;color:var(--muted);">Login sebagai:</div>
+      <div style="font-size:18px;font-weight:700;color:#60a5fa;" id="profileUserDisplay">—</div>
+      <div style="font-size:12px;color:var(--muted);" id="profileRoleDisplay">—</div>
+    </div>
+
+    <h3 style="margin:14px 0 8px;">🔑 Ganti Password</h3>
+    <div style="display:grid;gap:8px;">
+      <input id="profileCurrentPwd" type="password" placeholder="Password sekarang" style="padding:8px 12px;">
+      <input id="profileNewPwd" type="password" placeholder="Password baru (min 6 karakter)" style="padding:8px 12px;">
+      <input id="profileConfirmPwd" type="password" placeholder="Konfirmasi password baru" style="padding:8px 12px;">
+      <button onclick="profileChangePassword()" class="btn-primary" style="font-weight:700;">💾 Ganti Password</button>
+    </div>
+
+    <h3 style="margin:20px 0 8px;">🔐 Admin Master Password</h3>
+    <p style="color:var(--muted);font-size:12px;">Password TERPISAH dari login dashboard, hanya untuk akses menu Members. Set sekali, ingat baik-baik.</p>
+    <div style="display:grid;gap:8px;">
+      <input id="profileAdminCurrent" type="password" placeholder="Admin password sekarang (kosong jika belum di-set)" style="padding:8px 12px;">
+      <input id="profileAdminNew" type="password" placeholder="Set/ganti Admin master password (min 6 karakter)" style="padding:8px 12px;">
+      <button onclick="profileSetAdminPassword()" class="btn-warn" style="font-weight:700;">🔑 Set Admin Password</button>
+    </div>
+    <button onclick="profileOpenAdmin()" class="btn-purple" style="font-weight:700;width:100%;margin-top:12px;">🔐 Buka Members (pakai Admin password)</button>
+  </div>
+</div>
+
 <!-- ═══ AVAILABILITY CHECK MODAL ═══ -->
 <div class="modal-overlay" id="availCheckModal">
   <div class="modal" style="width:880px;max-width:96vw;max-height:92vh;overflow-y:auto;">
@@ -1793,7 +1822,7 @@ domain3.net
       <p class="subtitle">Expired domain metrics — DA, PA, DR, BL, Age, Nawala, Score, Status, Notes</p>
     </div>
     <div class="user-info">
-      <div class="user-badge">👤 <span id="currentUser"></span> · <span id="currentRole" style="color:#60a5fa;font-weight:600;"></span></div>
+      <div class="user-badge" onclick="openProfileMenu()" style="cursor:pointer;" title="Klik untuk ganti password / akses admin">👤 <span id="currentUser"></span> · <span id="currentRole" style="color:#60a5fa;font-weight:600;"></span> ▾</div>
       <button onclick="openSettings()">⚙️ Settings</button>
       <button class="btn-primary" onclick="openAI()">🤖 AI</button>
       <div class="import-menu" style="position:relative;display:inline-block;">
@@ -1804,7 +1833,6 @@ domain3.net
           <button onclick="openPasteImport();closeImportMenu();" style="display:block;width:100%;text-align:left;padding:10px 14px;background:transparent;color:var(--text);border:0;cursor:pointer;">📋 Paste Text</button>
         </div>
       </div>
-      <button onclick="openNawalaDash()" class="btn-danger">🔴 Nawala</button>
       <button id="expiryAlertBtn" onclick="showExpiringDomains()" style="display:none;background:#ef4444;color:white;font-weight:700;">⏰ <span id="expiryCount">0</span></button>
       <button onclick="logout()">Logout</button>
     </div>
@@ -1816,6 +1844,7 @@ domain3.net
     <a href="https://www.dapachecker.org/" target="_blank" class="quick-link dapa">🔵 DAPAChecker</a>
     <a href="https://trustpositif.komdigi.go.id/" target="_blank" class="quick-link nawala">🔴 Trust Positif</a>
     <a href="javascript:void(0)" onclick="openAvailCheck()" class="quick-link namecheap" style="border-left:3px solid #f97316;">🛒 Check Available</a>
+    <a href="javascript:void(0)" onclick="openNawalaDash()" class="quick-link nawala" style="border-left:3px solid #ef4444;">🔴 Nawala</a>
   </div>
 
   <div class="stats" id="stats">
@@ -3902,6 +3931,92 @@ function requireAdmin(actionName) {
 function logout() { localStorage.removeItem('dashboard_session'); location.reload(); }
 
 function openAdmin() { document.getElementById('adminModal').classList.add('active'); renderMembers(); }
+
+// Profile Menu — klik user badge
+function openProfileMenu() {
+  const session = JSON.parse(localStorage.getItem('dashboard_session') || '{}');
+  const user = session.username || '—';
+  const role = session.role || '—';
+  document.getElementById('profileUserDisplay').textContent = user;
+  document.getElementById('profileRoleDisplay').textContent = role === 'admin' ? '👑 Administrator' : '👤 User (view-only)';
+  document.getElementById('profileCurrentPwd').value = '';
+  document.getElementById('profileNewPwd').value = '';
+  document.getElementById('profileConfirmPwd').value = '';
+  document.getElementById('profileMenuModal').classList.add('active');
+}
+function closeProfileMenu() { document.getElementById('profileMenuModal').classList.remove('active'); }
+
+// Hash function (sama dengan login system)
+async function hashPwd(s) {
+  const buf = new TextEncoder().encode(s + '_domainsalt');
+  const hash = await crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+async function profileChangePassword() {
+  const cur = document.getElementById('profileCurrentPwd').value;
+  const newPwd = document.getElementById('profileNewPwd').value;
+  const conf = document.getElementById('profileConfirmPwd').value;
+  if (!cur || !newPwd || !conf) { toast('Isi semua field', 'warn'); return; }
+  if (newPwd.length < 6) { toast('Password baru min 6 karakter', 'warn'); return; }
+  if (newPwd !== conf) { toast('Konfirmasi password tidak match', 'error'); return; }
+
+  const session = JSON.parse(localStorage.getItem('dashboard_session') || '{}');
+  const username = session.username;
+  const members = JSON.parse(localStorage.getItem('dashboard_members') || '[]');
+  const idx = members.findIndex(m => m.username === username);
+  if (idx < 0) { toast('User tidak ditemukan', 'error'); return; }
+
+  const curHash = await hashPwd(cur);
+  if (members[idx].password !== curHash) {
+    toast('❌ Password sekarang salah', 'error', 4000);
+    return;
+  }
+  members[idx].password = await hashPwd(newPwd);
+  localStorage.setItem('dashboard_members', JSON.stringify(members));
+  if (typeof logActivity === 'function') logActivity('CHANGE_PASSWORD', username);
+  toast('✅ Password berhasil diganti. Login ulang sekali untuk effect penuh.', 'success', 5000);
+  closeProfileMenu();
+}
+
+async function profileSetAdminPassword() {
+  const cur = document.getElementById('profileAdminCurrent').value;
+  const newPwd = document.getElementById('profileAdminNew').value;
+  if (!newPwd || newPwd.length < 6) { toast('Password baru min 6 karakter', 'warn'); return; }
+  const stored = localStorage.getItem('dashboard_admin_master_pwd');
+  if (stored) {
+    // Verifikasi current dulu kalau sudah pernah set
+    const curH = await hashPwd(cur);
+    if (curH !== stored) { toast('❌ Admin password sekarang salah', 'error'); return; }
+  }
+  const newH = await hashPwd(newPwd);
+  localStorage.setItem('dashboard_admin_master_pwd', newH);
+  document.getElementById('profileAdminCurrent').value = '';
+  document.getElementById('profileAdminNew').value = '';
+  toast('✅ Admin master password tersimpan', 'success', 4000);
+}
+
+async function profileOpenAdmin() {
+  const session = JSON.parse(localStorage.getItem('dashboard_session') || '{}');
+  if (session.role !== 'admin') {
+    toast('❌ Hanya admin yang bisa akses Members', 'error', 4000);
+    return;
+  }
+  const stored = localStorage.getItem('dashboard_admin_master_pwd');
+  if (!stored) {
+    toast('Set Admin Master Password dulu di atas', 'warn', 5000);
+    return;
+  }
+  const pwd = prompt('🔐 Masukkan Admin Master Password (BUKAN login password):');
+  if (!pwd) return;
+  const h = await hashPwd(pwd);
+  if (h !== stored) {
+    toast('❌ Admin password salah', 'error', 4000);
+    return;
+  }
+  closeProfileMenu();
+  openAdmin();
+}
 function closeAdmin() { document.getElementById('adminModal').classList.remove('active'); }
 
 function renderMembers() {
