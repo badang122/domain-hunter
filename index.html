@@ -4016,10 +4016,27 @@ function logout() { localStorage.removeItem('dashboard_session'); location.reloa
 function openAdmin() { document.getElementById('adminModal').classList.add('active'); renderMembers(); }
 
 // Profile Menu — klik user badge
-function openProfileMenu() {
+async function openProfileMenu() {
   const session = JSON.parse(localStorage.getItem('dashboard_session') || '{}');
   const user = session.username || '—';
   const role = session.role || '—';
+  if (!user || user === '—') { toast('Session tidak ditemukan, login ulang', 'error'); return; }
+
+  // Re-auth: minta password login dulu sebelum buka menu Akun (security gate)
+  const pwd = prompt(`🔐 Konfirmasi identitas\n\nMasukkan password login ${user} untuk buka menu Akun:`);
+  if (pwd === null) return; // user cancel
+  if (!pwd) { toast('Password kosong', 'warn'); return; }
+
+  const members = JSON.parse(localStorage.getItem('dashboard_members') || '[]');
+  const me = members.find(m => m.username === user);
+  if (!me) { toast('User tidak ditemukan di members', 'error'); return; }
+  const h = await hashPwd(pwd);
+  if (h !== me.password) {
+    toast('❌ Password salah', 'error', 4000);
+    if (typeof logActivity === 'function') logActivity('FAILED_PROFILE_AUTH', user);
+    return;
+  }
+
   document.getElementById('profileUserDisplay').textContent = user;
   document.getElementById('profileRoleDisplay').textContent = role === 'admin' ? '👑 Administrator' : '👤 User (view-only)';
   document.getElementById('profileCurrentPwd').value = '';
