@@ -956,10 +956,11 @@
       <button onclick="openAvailCheck();closeSettings();" style="background:linear-gradient(135deg,#f97316,#dc2626);color:white;font-weight:700;padding:10px;">🛒 Check Available</button>
     </div>
 
-    <h3 style="margin:20px 0 8px;">📜 Aktivitas &amp; 👥 Anggota</h3>
+    <h3 style="margin:20px 0 8px;">👤 Akun &amp; 📜 Aktivitas</h3>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn-primary" onclick="closeSettings();openProfileMenu();">👤 Akun (ganti password)</button>
       <button onclick="openActivity()">📜 Activity Log</button>
-      <button id="adminBtnSettings" class="btn-purple" onclick="openAdmin()" style="display:none;">👥 Members</button>
+      <button id="adminBtnSettings" class="btn-purple" onclick="closeSettings();profileOpenAdmin();" style="display:none;">👥 Members (admin)</button>
     </div>
 
     <h3 style="margin:20px 0 8px;">Show/Hide Columns</h3>
@@ -1863,7 +1864,7 @@ domain3.net
       <p class="subtitle">Expired domain metrics — DA, PA, DR, BL, Age, Nawala, Score, Status, Notes</p>
     </div>
     <div class="user-info">
-      <div class="user-badge" onclick="openProfileMenu()" style="cursor:pointer;" title="Klik untuk ganti password / akses admin">👤 <span id="currentUser"></span> · <span id="currentRole" style="color:#60a5fa;font-weight:600;"></span> ▾</div>
+      <div class="user-badge" style="cursor:default;" title="Akun login">👤 <span id="currentUser"></span> · <span id="currentRole" style="color:#60a5fa;font-weight:600;"></span></div>
       <button onclick="openSettings()">⚙️ Settings</button>
       <button class="btn-primary" onclick="openAI()">🤖 AI</button>
       <div class="import-menu" style="position:relative;display:inline-block;">
