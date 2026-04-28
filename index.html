@@ -7713,7 +7713,7 @@ async function runAvailCheck() {
   const results = []; // { domain, status }
   let done = 0, available = 0, registered = 0, unknown = 0;
 
-  // Multi-provider DNS check — CONSERVATIVE (default: registered kalau ada respons)
+  // Multi-provider DNS check — STRICT (default: trust ANY positive signal as registered)
   async function dnsCheckProvider(dom, providerUrl) {
     try {
       const ctrl = new AbortController();
@@ -7732,7 +7732,10 @@ async function runAvailCheck() {
   }
 
   async function dnsCheckMulti(dom) {
-    // Cek berbagai record type — kalau ada YANG registered di provider manapun, trust itu
+    // Cek berbagai record type di banyak provider
+    // Kalau ANY provider bilang registered (Status != 3) → trust = registered
+    // Kalau MAYORITAS bilang NXDOMAIN → available
+    // Kalau timeout/error semua → null (unknown)
     const providers = [
       `https://dns.google/resolve?name=${encodeURIComponent(dom)}&type=NS`,
       `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(dom)}&type=NS`,
@@ -7741,31 +7744,46 @@ async function runAvailCheck() {
       `https://dns.google/resolve?name=${encodeURIComponent(dom)}&type=A`,
       `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(dom)}&type=A`,
       `https://dns.google/resolve?name=${encodeURIComponent(dom)}&type=MX`,
+      `https://dns.google/resolve?name=${encodeURIComponent(dom)}&type=TXT`,
     ];
-    let nxdomainCount = 0, registeredCount = 0;
+    let nxdomainCount = 0, totalAnswered = 0;
     for (const url of providers) {
       const r = await dnsCheckProvider(dom, url);
+      if (r === null) continue;
+      totalAnswered++;
       if (r === 'registered') return 'registered'; // kalau ANY provider bilang registered, trust
       if (r === 'available') nxdomainCount++;
     }
-    // Hanya jika 4+ provider sepakat NXDOMAIN baru consider available
-    if (nxdomainCount >= 4) return 'available';
+    // Butuh 5+ provider sepakat NXDOMAIN (lebih ketat dari sebelumnya 4+)
+    // Kalau total responses < 4, signalnya gak cukup → null (unknown)
+    if (totalAnswered >= 4 && nxdomainCount === totalAnswered) return 'available';
+    if (nxdomainCount >= 5) return 'available';
     return null;
   }
 
-  // RDAP with retry
+  // RDAP with retry (gunakan multi endpoint untuk reliability)
   async function rdapCheck(dom, retries = 2) {
-    for (let i = 0; i < retries; i++) {
-      try {
-        const ctrl = new AbortController();
-        const timer = setTimeout(() => ctrl.abort(), 7000);
-        const res = await fetch(`https://rdap.org/domain/${encodeURIComponent(dom)}`, { redirect: 'follow', signal: ctrl.signal });
-        clearTimeout(timer);
-        if (res.status === 404) return 'available';
-        if (res.ok) return 'registered';
-        if (res.status === 429) await new Promise(r => setTimeout(r, 2000)); // rate limit, wait
-      } catch {}
+    const endpoints = [
+      `https://rdap.org/domain/${encodeURIComponent(dom)}`,
+      `https://rdap.verisign.com/com/v1/domain/${encodeURIComponent(dom)}`, // for .com/.net
+    ];
+    let any404 = 0, any200 = 0;
+    for (const url of endpoints) {
+      for (let i = 0; i < retries; i++) {
+        try {
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), 7000);
+          const res = await fetch(url, { redirect: 'follow', signal: ctrl.signal });
+          clearTimeout(timer);
+          if (res.status === 404) { any404++; break; }
+          if (res.ok) { any200++; break; }
+          if (res.status === 429) { await new Promise(r => setTimeout(r, 2000)); continue; }
+          break;
+        } catch { /* timeout, try next */ }
+      }
     }
+    if (any200 > 0) return 'registered';
+    if (any404 > 0) return 'available';
     return null;
   }
 
@@ -7776,18 +7794,17 @@ async function runAvailCheck() {
       // Run RDAP + DNS PARALEL untuk akurasi maksimal
       const [rdap, dns] = await Promise.all([rdapCheck(dom), dnsCheckMulti(dom)]);
       let status = 'unknown';
-      // Logic agreement:
-      // - DNS bilang registered → TRUSTED registered (pasti ada record)
-      // - RDAP+DNS sama-sama available → TRUSTED available
-      // - RDAP available tapi DNS registered → konflik, trust DNS = registered
-      // - RDAP registered tapi DNS unknown → registered
-      // - Both unknown → unknown
+      // Logic STRICT — sesuai Namecheap:
+      // 1. DNS apapun bilang registered → TRUSTED registered (ada record DNS = pasti ada)
+      // 2. RDAP bilang registered → TRUSTED registered
+      // 3. RDAP DAN DNS keduanya available → TRUSTED available (high confidence)
+      // 4. Kalau salah satu null/unclear → UNKNOWN (jangan klaim available)
+      // Ini kebalikan dari versi lama yg trust RDAP 404 sendirian — itu bug yg bikin
+      // kinovam.com, qm-nano.com dll false positive sebagai available.
       if (dns === 'registered') status = 'registered';
       else if (rdap === 'registered') status = 'registered';
       else if (rdap === 'available' && dns === 'available') status = 'available';
-      else if (rdap === 'available' && dns === null) status = 'available'; // DNS no response, trust RDAP 404
-      else if (dns === 'available' && rdap === null) status = 'available';
-      else status = 'unknown';
+      else status = 'unknown'; // konservatif — kalau tidak yakin, biar user verify manual
       // Tally
       if (status === 'available') available++;
       else if (status === 'registered') registered++;
