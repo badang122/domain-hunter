@@ -7761,26 +7761,57 @@ async function runAvailCheck() {
     return null;
   }
 
-  // RDAP with retry (gunakan multi endpoint untuk reliability)
+  // TLD → RDAP server map (direct = avoid rdap.org redirect CORS issues)
+  function getRdapEndpointsForDomain(dom) {
+    const tld = dom.split('.').pop().toLowerCase();
+    const tldMap = {
+      'com':  'https://rdap.verisign.com/com/v1/domain/',
+      'net':  'https://rdap.verisign.com/net/v1/domain/',
+      'org':  'https://rdap.publicinterestregistry.org/rdap/domain/',
+      'info': 'https://rdap.identitydigital.services/rdap/domain/',
+      'biz':  'https://rdap.nic.biz/domain/',
+      'us':   'https://rdap.nic.us/domain/',
+      'co':   'https://rdap.nic.co/domain/',
+      'io':   'https://rdap.identitydigital.services/rdap/domain/',
+      'me':   'https://rdap.nic.me/domain/',
+      'tv':   'https://tvwalrus.verisign-grs.com/rdap/v1/domain/',
+      'cc':   'https://ccwalrus.verisign-grs.com/rdap/v1/domain/',
+      'xyz':  'https://rdap.centralnic.com/xyz/domain/',
+      'site': 'https://rdap.centralnic.com/site/domain/',
+      'online': 'https://rdap.centralnic.com/online/domain/',
+      'store': 'https://rdap.centralnic.com/store/domain/',
+      'shop': 'https://rdap.nic.shop/domain/',
+      'app':  'https://rdap.nic.google/domain/',
+      'dev':  'https://rdap.nic.google/domain/',
+      'page': 'https://rdap.nic.google/domain/',
+      'ai':   'https://rdap.nic.ai/domain/',
+    };
+    const direct = tldMap[tld];
+    const endpoints = [];
+    if (direct) endpoints.push(direct + encodeURIComponent(dom));
+    // Always try rdap.org as fallback (handles unknown TLDs via redirect)
+    endpoints.push('https://rdap.org/domain/' + encodeURIComponent(dom));
+    return endpoints;
+  }
+
+  // RDAP check — direct ke TLD server dulu (no redirect = no CORS issue)
   async function rdapCheck(dom, retries = 2) {
-    const endpoints = [
-      `https://rdap.org/domain/${encodeURIComponent(dom)}`,
-      `https://rdap.verisign.com/com/v1/domain/${encodeURIComponent(dom)}`, // for .com/.net
-    ];
+    const endpoints = getRdapEndpointsForDomain(dom);
     let any404 = 0, any200 = 0;
     for (const url of endpoints) {
       for (let i = 0; i < retries; i++) {
         try {
           const ctrl = new AbortController();
-          const timer = setTimeout(() => ctrl.abort(), 7000);
+          const timer = setTimeout(() => ctrl.abort(), 8000);
           const res = await fetch(url, { redirect: 'follow', signal: ctrl.signal });
           clearTimeout(timer);
           if (res.status === 404) { any404++; break; }
           if (res.ok) { any200++; break; }
-          if (res.status === 429) { await new Promise(r => setTimeout(r, 2000)); continue; }
+          if (res.status === 429) { await new Promise(r => setTimeout(r, 2500)); continue; }
           break;
-        } catch { /* timeout, try next */ }
+        } catch { /* CORS/timeout, try next */ }
       }
+      if (any200 > 0) break; // got definitive answer, stop
     }
     if (any200 > 0) return 'registered';
     if (any404 > 0) return 'available';
