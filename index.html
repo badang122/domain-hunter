@@ -3859,6 +3859,12 @@ async function initAuth() {
     localStorage.setItem('dashboard_members', JSON.stringify(members));
   }
 
+  // Auto-default Admin Master Password = "1901Fcbarcelona" (SHA-256 + _domainsalt)
+  // Cross-device: setiap browser yg buka dashboard akan inherit password ini otomatis kalau belum set.
+  if (!localStorage.getItem('dashboard_admin_master_pwd')) {
+    localStorage.setItem('dashboard_admin_master_pwd', 'a9243ce862b6a217844c8bba48c087bd9ab741bb28a8a20c3b778e72707f7282');
+  }
+
   const session = localStorage.getItem('dashboard_session');
   if (session) {
     const s = JSON.parse(session);
