@@ -571,6 +571,47 @@
   .add-form-row input, .add-form-row select { padding: 10px 12px; }
   .add-form-row input[type=text]:first-of-type { min-width: 280px; flex: 1; }
 
+  /* Add Domain — grouped sections */
+  .form-section {
+    flex: 1 1 100%;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.06);
+    background: rgba(255,255,255,0.02);
+    margin-top: 4px;
+  }
+  .form-section.moz   { background: linear-gradient(180deg, rgba(59,130,246,0.07), rgba(59,130,246,0.02)); border-color: rgba(59,130,246,0.25); }
+  .form-section.ahrefs{ background: linear-gradient(180deg, rgba(16,185,129,0.07), rgba(16,185,129,0.02)); border-color: rgba(16,185,129,0.28); }
+  .form-section.basic { background: linear-gradient(180deg, rgba(139,92,246,0.07), rgba(139,92,246,0.02)); border-color: rgba(139,92,246,0.28); }
+  .form-section-title {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; font-weight: 800; letter-spacing: 0.04em;
+    text-transform: uppercase; margin-bottom: 10px;
+    color: #cbd5e1;
+  }
+  .form-section-title .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .form-section.moz   .dot { background: #3b82f6; box-shadow: 0 0 10px #3b82f6; }
+  .form-section.ahrefs .dot { background: #10b981; box-shadow: 0 0 10px #10b981; }
+  .form-section.basic .dot { background: #8b5cf6; box-shadow: 0 0 10px #8b5cf6; }
+  .form-section-grid {
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;
+  }
+  .form-section-hint { font-size: 11px; color: var(--muted); margin-top: 6px; }
+
+  body.light .form-section { background: rgba(255,255,255,0.6); border-color: rgba(0,0,0,0.08); }
+  body.light .form-section.moz   { background: linear-gradient(180deg, rgba(59,130,246,0.10), rgba(59,130,246,0.03)); }
+  body.light .form-section.ahrefs{ background: linear-gradient(180deg, rgba(16,185,129,0.10), rgba(16,185,129,0.03)); }
+  body.light .form-section.basic { background: linear-gradient(180deg, rgba(139,92,246,0.10), rgba(139,92,246,0.03)); }
+  body.light .form-section-title { color: #1f2937 !important; }
+
+  .form-actions {
+    flex: 1 1 100%;
+    display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+    margin-top: 6px; padding-top: 12px;
+    border-top: 1px dashed rgba(255,255,255,0.08);
+  }
+  body.light .form-actions { border-top-color: rgba(0,0,0,0.08); }
+
   /* Field labels dengan icon colorful */
   .field-label {
     display: flex;
@@ -1857,78 +1898,114 @@ domain3.net
   </div>
 
   <div class="panel">
-    <h3 style="margin-bottom:10px;font-size:14px;">➕ Add Domain</h3>
-    <div class="add-form-row" style="align-items:flex-end;">
-      <div style="flex:1;min-width:240px;">
-        <label class="field-label"><span class="field-icon" style="background:#6366f1;">🌐</span> Domain</label>
-        <input id="newDomain" type="text" placeholder="example.com" style="width:100%;">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+      <h3 style="font-size:15px;margin:0;display:flex;align-items:center;gap:8px;">
+        <span style="background:#6366f1;color:#fff;width:28px;height:28px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-size:14px;">➕</span>
+        Tambah Domain Baru
+      </h3>
+      <span style="font-size:11px;color:var(--muted);">Wajib: <b style="color:#a78bfa;">Domain</b> · sisanya opsional</span>
+    </div>
+
+    <div class="add-form-row" style="align-items:flex-start;">
+
+      <!-- Section 1: Domain Info -->
+      <div class="form-section basic">
+        <div class="form-section-title"><span class="dot"></span>📝 Info Domain</div>
+        <div class="form-section-grid">
+          <div style="flex:2;min-width:260px;">
+            <label class="field-label"><span class="field-icon" style="background:#6366f1;">🌐</span> Domain</label>
+            <input id="newDomain" type="text" placeholder="contoh: example.com" style="width:100%;">
+          </div>
+          <div>
+            <label class="field-label"><span class="field-icon" style="background:#ec4899;">📅</span> Umur (tahun)</label>
+            <div style="display:flex;gap:4px;">
+              <input id="newAge" type="text" placeholder="contoh: 5" style="width:90px;" title="Tahun atau — (dash) jika tidak tahu">
+              <button type="button" onclick="document.getElementById('newAge').value='—'" title="Tidak tahu umur" style="padding:8px 10px;background:#374151;color:#fff;border:1px solid rgba(255,255,255,0.1);border-radius:8px;cursor:pointer;font-weight:700;">—</button>
+            </div>
+          </div>
+        </div>
+        <div class="form-section-hint">💡 Domain auto-fill umur via RDAP setelah ditambahkan.</div>
       </div>
-      <div>
-        <label class="field-label"><span class="field-icon" style="background:#3b82f6;">DA</span> Domain Auth</label>
-        <input id="newDA" type="number" min="0" placeholder="0-100" style="width:85px;">
-      </div>
-      <div>
-        <label class="field-label"><span class="field-icon" style="background:#3b82f6;">PA</span> Page Auth</label>
-        <input id="newPA" type="number" min="0" placeholder="0-100" style="width:85px;">
-      </div>
-      <div>
-        <label class="field-label"><span class="field-icon" style="background:#f59e0b;">SS</span> Spam %</label>
-        <input id="newSS" type="number" min="0" placeholder="0-100" style="width:85px;">
-      </div>
-      <div>
-        <label class="field-label"><span class="field-icon" style="background:#ec4899;">📅</span> Age (thn)</label>
-        <div style="display:flex;gap:4px;">
-          <input id="newAge" type="text" placeholder="0 / —" style="width:70px;" title="Tahun atau - (dash jika tidak tahu)">
-          <button type="button" onclick="document.getElementById('newAge').value='—'" title="Tidak tahu umur" style="padding:8px 10px;background:#374151;color:#fff;border:1px solid rgba(255,255,255,0.1);border-radius:8px;cursor:pointer;font-weight:700;">—</button>
+
+      <!-- Section 2: Moz Metrics -->
+      <div class="form-section moz">
+        <div class="form-section-title"><span class="dot"></span>📊 Moz Metrics <span style="font-weight:500;text-transform:none;color:var(--muted);font-size:11px;letter-spacing:0;">— dari DAPAChecker</span></div>
+        <div class="form-section-grid">
+          <div>
+            <label class="field-label"><span class="field-icon" style="background:#3b82f6;">DA</span> Domain Auth</label>
+            <input id="newDA" type="number" min="0" placeholder="0-100" style="width:100px;">
+          </div>
+          <div>
+            <label class="field-label"><span class="field-icon" style="background:#3b82f6;">PA</span> Page Auth</label>
+            <input id="newPA" type="number" min="0" placeholder="0-100" style="width:100px;">
+          </div>
+          <div>
+            <label class="field-label"><span class="field-icon" style="background:#f59e0b;">SS</span> Spam Score</label>
+            <input id="newSS" type="number" min="0" placeholder="0-100 (%)" style="width:110px;">
+          </div>
         </div>
       </div>
-      <div>
-        <label class="field-label"><span class="field-icon" style="background:#10b981;">DR</span> Dom Rating</label>
-        <input id="newDR" type="number" min="0" placeholder="0-100" style="width:85px;">
+
+      <!-- Section 3: Ahrefs Metrics -->
+      <div class="form-section ahrefs">
+        <div class="form-section-title"><span class="dot"></span>🔶 Ahrefs Metrics <span style="font-weight:500;text-transform:none;color:var(--muted);font-size:11px;letter-spacing:0;">— dari Ahrefs Backlink Checker</span></div>
+        <div class="form-section-grid">
+          <div>
+            <label class="field-label"><span class="field-icon" style="background:#10b981;">DR</span> Domain Rating</label>
+            <input id="newDR" type="number" min="0" placeholder="0-100" style="width:100px;">
+          </div>
+          <div>
+            <label class="field-label"><span class="field-icon" style="background:#10b981;">UR</span> URL Rating</label>
+            <input id="newUR" type="number" min="0" placeholder="0-100" style="width:100px;">
+          </div>
+          <div>
+            <label class="field-label"><span class="field-icon" style="background:#8b5cf6;">BL</span> Backlinks</label>
+            <input id="newBL" type="text" placeholder="contoh: 307K" style="width:120px;">
+          </div>
+          <div>
+            <label class="field-label"><span class="field-icon" style="background:#06b6d4;">RD</span> Rating Domain</label>
+            <input id="newRD" type="text" placeholder="angka cepat" style="width:120px;" title="Angka cepat (450). Untuk daftar lengkap, isi textarea di bawah.">
+          </div>
+        </div>
       </div>
-      <div>
-        <label class="field-label"><span class="field-icon" style="background:#10b981;">UR</span> URL Rating</label>
-        <input id="newUR" type="number" min="0" placeholder="0-100" style="width:85px;">
-      </div>
-      <div>
-        <label class="field-label"><span class="field-icon" style="background:#8b5cf6;">BL</span> Backlinks</label>
-        <input id="newBL" type="text" placeholder="307K" style="width:100px;">
-      </div>
-      <div>
-        <label class="field-label"><span class="field-icon" style="background:#06b6d4;">RD</span> Rating Domain</label>
-        <input id="newRD" type="text" placeholder="list/angka" style="width:120px;" title="Angka (450) atau list domain (gravatar.com, adobe.com...)">
-      </div>
-      <!-- RD Full list textarea — di samping Age (full-width, wrap ke baris baru) -->
-      <div style="flex:1 1 100%;margin-top:4px;padding:10px;background:rgba(6,182,212,0.08);border:1px solid rgba(6,182,212,0.3);border-radius:10px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:6px;">
-          <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#67e8f9;">
-            <span style="background:#06b6d4;color:#fff;padding:2px 8px;border-radius:6px;font-size:11px;">RD</span>
-            🔗 Good Backlink (Full list — opsional):
+
+      <!-- Section 4: Good Backlink (full list) -->
+      <div style="flex:1 1 100%;margin-top:4px;padding:12px 14px;background:rgba(6,182,212,0.08);border:1px solid rgba(6,182,212,0.3);border-radius:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:800;color:#67e8f9;text-transform:uppercase;letter-spacing:0.04em;">
+            <span style="background:#06b6d4;color:#fff;padding:3px 9px;border-radius:6px;font-size:11px;">RD</span>
+            🔗 Good Backlinks <span style="font-weight:500;text-transform:none;color:var(--muted);font-size:11px;letter-spacing:0;">— daftar lengkap (opsional)</span>
           </label>
-          <div style="display:flex;gap:4px;">
-            <button type="button" onclick="pasteToRDTextarea()" style="background:#6366f1;color:white;border:0;padding:3px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;">📋 Paste clipboard</button>
-            <button type="button" onclick="document.getElementById('newRDfull').value=''" style="background:#374151;color:white;border:0;padding:3px 10px;border-radius:6px;cursor:pointer;font-size:11px;">Clear</button>
+          <div style="display:flex;gap:6px;">
+            <button type="button" onclick="pasteToRDTextarea()" style="background:#6366f1;color:white;border:0;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;">📋 Paste</button>
+            <button type="button" onclick="document.getElementById('newRDfull').value=''" style="background:#374151;color:white;border:0;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:11px;">Clear</button>
           </div>
         </div>
         <textarea id="newRDfull" rows="2" style="width:100%;font-family:monospace;font-size:13px;resize:vertical;"
-                  placeholder="Contoh: gravatar.com, adobe.com, behance.net, issuu.com, twitch.tv, gitlab.com, heylink.me, disqus.com — atau bebas teks apa saja"></textarea>
-        <div style="font-size:11px;color:var(--muted);margin-top:4px;">💡 <b>Quick input</b>: isi kolom <b>RD</b> di atas (kecil) untuk angka/singkat. <b>Full list</b>: isi textarea ini untuk daftar lengkap. Kalau keduanya diisi, textarea dipakai.</div>
+                  placeholder="Contoh: gravatar.com, adobe.com, behance.net, issuu.com, twitch.tv, gitlab.com, heylink.me, disqus.com"></textarea>
+        <div class="form-section-hint">💡 Isi <b>RD</b> di atas untuk angka cepat, atau textarea ini untuk daftar lengkap. Kalau keduanya diisi, textarea diutamakan.</div>
       </div>
-      <!-- Note inline textarea — opsional saat add domain -->
-      <div style="flex:1 1 100%;margin-top:4px;padding:10px;background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.3);border-radius:10px;">
-        <label style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:12px;font-weight:700;color:#fbbf24;">
-          <span style="background:#fbbf24;color:#1f2937;padding:2px 8px;border-radius:6px;font-size:11px;">📝</span>
-          Note (opsional):
+
+      <!-- Section 5: Note -->
+      <div style="flex:1 1 100%;margin-top:4px;padding:12px 14px;background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.3);border-radius:12px;">
+        <label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:12px;font-weight:800;color:#fbbf24;text-transform:uppercase;letter-spacing:0.04em;">
+          <span style="background:#fbbf24;color:#1f2937;padding:3px 9px;border-radius:6px;font-size:11px;">📝</span>
+          Catatan <span style="font-weight:500;text-transform:none;color:var(--muted);font-size:11px;letter-spacing:0;">— opsional</span>
         </label>
         <textarea id="newNotes" rows="2" style="width:100%;font-size:13px;resize:vertical;"
-                  placeholder="Catatan: harga, alasan beli, target buyer, niche idea, dll..."></textarea>
-        <div style="font-size:11px;color:var(--muted);margin-top:4px;">💡 Note bisa di-edit nanti via tombol 📝 di row tabel.</div>
+                  placeholder="Harga, alasan beli, target buyer, niche idea..."></textarea>
+        <div class="form-section-hint">💡 Bisa di-edit nanti via tombol 📝 di row tabel.</div>
       </div>
-      <button class="btn-success" onclick="addDomain(false)" style="height:40px;font-weight:700;">➕ Add</button>
-      <button class="btn-primary" onclick="autoCheckDomain()" title="Buka Ahrefs, DAPAChecker, Nawala" style="height:40px;font-weight:700;">🔍 Auto-Check</button>
+
+      <!-- Action buttons -->
+      <div class="form-actions">
+        <button class="btn-success" onclick="addDomain(false)" style="height:42px;font-weight:700;padding:0 22px;font-size:14px;">➕ Tambah Domain</button>
+        <button class="btn-primary" onclick="autoCheckDomain()" title="Buka Ahrefs, DAPAChecker, Nawala di tab baru" style="height:42px;font-weight:700;padding:0 18px;font-size:14px;">🔍 Auto-Check</button>
+        <span style="margin-left:auto;font-size:11px;color:var(--muted);">Shortcut: <kbd style="background:rgba(255,255,255,0.1);padding:2px 6px;border-radius:4px;font-family:monospace;">N</kbd> fokus ke input</span>
+      </div>
     </div>
 
-    <p class="hint" id="checkStatus" style="margin-top:10px;">Tip: Input domain → <strong>Age auto-filled</strong>. 3 tabs open for manual DA/PA/DR/BL/Nawala check.</p>
+    <p class="hint" id="checkStatus" style="margin-top:12px;">💡 Tip: input domain → <b>Auto-Check</b> buka 3 tab (Ahrefs · DAPAChecker · Nawala) untuk cek metrics manual.</p>
   </div>
 
   <div class="panel">
