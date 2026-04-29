@@ -959,6 +959,7 @@
       <button onclick="bulkAliveCheck();closeSettings();" style="background:linear-gradient(135deg,#0891b2,#0369a1);color:white;font-weight:700;padding:10px;">🟢 Alive Check (Bulk)</button>
       <button onclick="bulkRDAPAge();closeSettings();" style="background:linear-gradient(135deg,#ec4899,#be185d);color:white;font-weight:700;padding:10px;">📅 Fetch Age (RDAP)</button>
       <button onclick="openAvailCheck();closeSettings();" style="background:linear-gradient(135deg,#f97316,#dc2626);color:white;font-weight:700;padding:10px;">🛒 Check Available</button>
+      <button onclick="bulkSetProviderToNamecheap();" style="background:linear-gradient(135deg,#ff5a00,#cc4700);color:white;font-weight:700;padding:10px;" title="Set semua domain provider → Namecheap">🏢 Set All → Namecheap</button>
     </div>
 
     <h3 style="margin:20px 0 8px;">👤 Akun &amp; 📜 Aktivitas</h3>
@@ -7003,6 +7004,55 @@ function saveProvider(domain) {
   toast(`🏢 Provider ${domain} → ${val || '(cleared)'}`, 'success', 2500);
   render();
 }
+
+function bulkSetProviderToNamecheap(silent = false) {
+  // Set semua domain di custom + meta jadi Namecheap
+  const custom = JSON.parse(localStorage.getItem('dashboard_custom_domains') || '[]');
+  const meta = JSON.parse(localStorage.getItem('dashboard_meta') || '{}');
+  for (const d of custom) {
+    d.provider = 'Namecheap';
+  }
+  for (const dom of Object.keys(meta)) {
+    if (!meta[dom]) continue;
+    meta[dom].provider = 'Namecheap';
+    meta[dom].registrar = 'Namecheap';
+  }
+  // Pastikan meta entry ada untuk semua domain di custom (kalau belum ada)
+  for (const d of custom) {
+    if (!meta[d.domain]) meta[d.domain] = { provider: 'Namecheap', registrar: 'Namecheap' };
+  }
+  // Termasuk allData hardcoded di HTML
+  if (typeof allData !== 'undefined' && Array.isArray(allData)) {
+    for (const d of allData) {
+      d.provider = 'Namecheap';
+      if (!meta[d.domain]) meta[d.domain] = {};
+      meta[d.domain].provider = 'Namecheap';
+      meta[d.domain].registrar = 'Namecheap';
+    }
+  }
+  localStorage.setItem('dashboard_custom_domains', JSON.stringify(custom));
+  localStorage.setItem('dashboard_meta', JSON.stringify(meta));
+  if (typeof applyFilters === 'function') applyFilters();
+  if (!silent && typeof toast === 'function') {
+    toast(`🏢 ${custom.length} domain di-set ke Namecheap`, 'success', 3500);
+  }
+  if (typeof logActivity === 'function') logActivity('BULK_SET_PROVIDER', `Namecheap (${custom.length} domain)`);
+  return custom.length;
+}
+
+// Auto-migration: jalan sekali per device, set semua provider default ke Namecheap
+function _autoSetNamecheapOnce() {
+  const FLAG = 'dashboard_provider_default_namecheap_v1';
+  if (localStorage.getItem(FLAG)) return;
+  setTimeout(() => {
+    const count = bulkSetProviderToNamecheap(true);
+    localStorage.setItem(FLAG, '1');
+    if (count > 0 && typeof toast === 'function') {
+      toast(`🏢 Auto: ${count} domain provider di-set ke Namecheap`, 'success', 4000);
+    }
+  }, 2500);
+}
+_autoSetNamecheapOnce();
 
 // Edit GoodBL list per-domain via modal
 function editGoodBL(domain) {
