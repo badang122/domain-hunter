@@ -8132,16 +8132,19 @@ async function runAvailCheck() {
       const dnsStrong = dnsAvailable && dnsRaw.strength === 'strong';
 
       let status = 'registered';
-      // Logic SIMPLIFIED — binary: available atau registered (no unknown):
-      // 1. DNS register / RDAP register → registered
-      // 2. RDAP available + DNS available → available (high confidence)
-      // 3. DNS unanimous strong NXDOMAIN + RDAP null → available (DNS-only fallback)
-      // 4. Default — anything else → registered (safer — user can manual mark via 🟢 button)
+      // Logic — RDAP authoritative untuk available:
+      // 1. DNS bilang registered (ada record) → registered (DNS resolve = pasti ada)
+      // 2. RDAP bilang registered → registered
+      // 3. RDAP bilang available (404 dari Verisign/PIR/dll = authoritative) → available
+      //    Tidak perlu DNS confirmation karena RDAP ke registry langsung,
+      //    DNS NXDOMAIN bisa false-negative (Indonesian ISP block DoH dll)
+      // 4. RDAP null (timeout) + DNS strong NXDOMAIN → available (DNS fallback)
+      // 5. Default — registered (safer)
       if (dnsRegistered) status = 'registered';
       else if (rdap === 'registered') status = 'registered';
-      else if (rdap === 'available' && dnsAvailable) status = 'available';
-      else if (rdap === null && dnsStrong) status = 'available';
-      else status = 'registered'; // safer default — user verify manual kalau perlu
+      else if (rdap === 'available') status = 'available'; // RDAP 404 = authoritative available
+      else if (dnsStrong) status = 'available';
+      else status = 'registered';
       // Tally
       if (status === 'available') available++;
       else registered++;
