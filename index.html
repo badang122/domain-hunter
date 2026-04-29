@@ -369,16 +369,17 @@
   th:hover { color: var(--text); background: var(--panel-hover); }
   th.sorted-asc::after { content: " ↑"; color: var(--accent); }
   th.sorted-desc::after { content: " ↓"; color: var(--accent); }
-  td { padding: 10px; border-bottom: 1px solid rgba(148,163,184,0.22); border-right: 1px solid rgba(148,163,184,0.22); font-size: 13px; }
+  td { padding: 12px 10px; border-bottom: 1px solid rgba(148,163,184,0.12); border-right: 1px solid rgba(148,163,184,0.10); font-size: 13px; }
   td:last-child { border-right: none; }
   td[contenteditable]:focus { outline: 2px solid var(--accent); background: var(--bg-soft); border-radius: 4px; }
-  tr:hover td { background: var(--panel-hover); }
+  tbody tr:nth-child(even) td { background: rgba(255,255,255,0.018); }
+  tbody tr:hover td { background: rgba(99,102,241,0.06) !important; }
   tr:last-child td { border-bottom: none; }
-  .domain { font-weight: 600; color: #a5b4fc; }
+  .domain { font-weight: 500; color: #a5b4fc; }
   .domain:hover { color: var(--accent); text-decoration: underline; cursor: pointer; }
-  .good { color: #34d399; font-weight: 600; }
-  .mid { color: #fbbf24; font-weight: 500; }
-  .bad { color: #f87171; }
+  .good { color: #6ee7b7; font-weight: 500; }
+  .mid { color: #fcd34d; font-weight: 500; }
+  .bad { color: #fca5a5; font-weight: 500; }
   .empty { color: var(--muted); opacity: 0.4; }
 
   /* Tags / Status badges */
@@ -643,7 +644,7 @@
 
   /* Score badge - visual progress */
   .score {
-    font-weight: 700;
+    font-weight: 600;
     padding: 4px 10px;
     border-radius: 6px;
     display: inline-block;
@@ -651,9 +652,9 @@
     text-align: center;
     font-size: 12px;
   }
-  .score.s-high { background: linear-gradient(135deg, rgba(16,185,129,0.25), rgba(16,185,129,0.1)); color: #34d399; border: 1px solid rgba(16,185,129,0.4); }
-  .score.s-mid  { background: linear-gradient(135deg, rgba(245,158,11,0.25), rgba(245,158,11,0.1)); color: #fbbf24; border: 1px solid rgba(245,158,11,0.4); }
-  .score.s-low  { background: linear-gradient(135deg, rgba(239,68,68,0.25), rgba(239,68,68,0.1)); color: #f87171; border: 1px solid rgba(239,68,68,0.4); }
+  .score.s-high { background: rgba(16,185,129,0.10); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.25); }
+  .score.s-mid  { background: rgba(245,158,11,0.10); color: #fcd34d; border: 1px solid rgba(245,158,11,0.25); }
+  .score.s-low  { background: rgba(239,68,68,0.10); color: #fca5a5; border: 1px solid rgba(239,68,68,0.25); }
 
   .hint { color: var(--muted); font-size: 12px; margin-top: 8px; }
   #checkStatus { color: var(--accent); }
@@ -672,13 +673,17 @@
   .btn-ai { background: var(--gradient); color: white; border: none; }
   .btn-ai:hover { box-shadow: 0 6px 24px rgba(139,92,246,0.5); }
 
-  /* ═══ FORCE SEMUA TEXT PUTIH PEKAT ═══ */
-  body, body * { color: #ffffff !important; }
-  .good { color: #34d399 !important; }
-  .mid { color: #fbbf24 !important; }
-  .bad, .score.s-low { color: #f87171 !important; }
-  .score.s-high { color: #34d399 !important; }
-  .score.s-mid { color: #fbbf24 !important; }
+  /* ═══ TEXT BASE COLOR — soft white (mata gak sakit) ═══ */
+  body { color: #e2e8f0; }
+  body * { color: inherit; }
+  /* Tabel sengaja sedikit redup biar gak silau */
+  tbody td { color: #cbd5e1; }
+  /* Hanya text penting yg pakai warna saturated */
+  .good { color: #6ee7b7 !important; }
+  .mid { color: #fcd34d !important; }
+  .bad, .score.s-low { color: #fca5a5 !important; }
+  .score.s-high { color: #6ee7b7 !important; }
+  .score.s-mid { color: #fcd34d !important; }
   .domain, .domain * { color: #a5b4fc !important; }
   a:not(.check-link):not(.quick-link):not(.pill) { color: #93c5fd !important; }
   h1 { -webkit-text-fill-color: transparent !important; color: transparent !important; }
