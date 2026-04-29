@@ -8131,28 +8131,25 @@ async function runAvailCheck() {
       const dnsAvailable = (dnsRaw && typeof dnsRaw === 'object' && dnsRaw.type === 'available');
       const dnsStrong = dnsAvailable && dnsRaw.strength === 'strong';
 
-      let status = 'unknown';
-      // Logic — kombinasi RDAP & DNS:
-      // 1. DNS register / RDAP register → TRUSTED registered
-      // 2. RDAP available + DNS available → TRUSTED available (high confidence)
-      // 3. DNS unanimous strong NXDOMAIN + RDAP gagal/null → TRUSTED available (DNS-only fallback)
-      //    Karena: kalau RDAP timeout/rate-limited tapi 8/8 DNS provider sepakat NXDOMAIN,
-      //    kemungkinan available jauh lebih tinggi dari redemption period (yg jarang).
-      // 4. RDAP available tapi DNS tidak unanimous → unknown (parked domain bisa lookalike)
+      let status = 'registered';
+      // Logic SIMPLIFIED — binary: available atau registered (no unknown):
+      // 1. DNS register / RDAP register → registered
+      // 2. RDAP available + DNS available → available (high confidence)
+      // 3. DNS unanimous strong NXDOMAIN + RDAP null → available (DNS-only fallback)
+      // 4. Default — anything else → registered (safer — user can manual mark via 🟢 button)
       if (dnsRegistered) status = 'registered';
       else if (rdap === 'registered') status = 'registered';
       else if (rdap === 'available' && dnsAvailable) status = 'available';
-      else if (rdap === null && dnsStrong) status = 'available'; // RDAP failed + DNS unanimous = trust DNS
-      else status = 'unknown'; // konservatif — kalau ragu, biar user verify manual
+      else if (rdap === null && dnsStrong) status = 'available';
+      else status = 'registered'; // safer default — user verify manual kalau perlu
       // Tally
       if (status === 'available') available++;
-      else if (status === 'registered') registered++;
-      else unknown++;
+      else registered++;
       results.push({ domain: dom, status });
       done++;
       const pct = Math.round((done/total)*100);
       document.getElementById('availProgressBar').style.width = pct + '%';
-      document.getElementById('availProgressText').textContent = `${done}/${total} (${pct}%) — 🟢 ${available} | 🔴 ${registered} | ⚠️ ${unknown}`;
+      document.getElementById('availProgressText').textContent = `${done}/${total} (${pct}%) — 🟢 ${available} | 🔴 ${registered}`;
       document.title = `🔍 ${done}/${total} · 🟢${available}`;
     }
   }
@@ -8166,13 +8163,11 @@ async function runAvailCheck() {
   // Render result table
   document.getElementById('availResult').innerHTML = `
     <div style="background:rgba(16,185,129,0.1);padding:10px;border-radius:8px;margin-bottom:10px;font-size:13px;">
-      ✅ Selesai: 🟢 <b>${available} available</b> · 🔴 ${registered} registered · ⚠️ ${unknown} unknown
+      ✅ Selesai: 🟢 <b>${available} available</b> · 🔴 ${registered} registered
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
       ${available > 0 ? `<button onclick="availImportToDashboard()" class="btn-success" style="font-weight:700;">📥 Import ${available} Available ke Dashboard</button>` : ''}
       ${available > 0 ? `<button onclick="availCopyByStatus('available')" style="background:#10b981;color:white;font-weight:700;padding:8px 14px;border:0;border-radius:8px;cursor:pointer;">📋 Copy ${available} Available</button>` : ''}
-      ${unknown > 0 ? `<button onclick="availOpenAllNamecheap('unknown')" class="btn-warn" style="font-weight:700;">🔍 Cek ${unknown} Unknown di Namecheap (max 20 tab)</button>` : ''}
-      ${unknown > 0 ? `<button onclick="availCopyByStatus('unknown')" style="background:#f59e0b;color:white;font-weight:700;padding:8px 14px;border:0;border-radius:8px;cursor:pointer;">📋 Copy ${unknown} Unknown</button>` : ''}
       ${registered > 0 ? `<button onclick="availOpenAllNamecheap('registered')" style="background:#6366f1;color:white;font-weight:700;padding:8px 14px;border:0;border-radius:8px;cursor:pointer;">🔍 Cek ${registered} Registered (max 20)</button>` : ''}
       ${registered > 0 ? `<button onclick="availCopyByStatus('registered')" style="background:#94a3b8;color:white;font-weight:700;padding:8px 14px;border:0;border-radius:8px;cursor:pointer;">📋 Copy ${registered} Registered</button>` : ''}
       <button onclick="availCopySelected()" style="background:#475569;color:white;font-weight:700;padding:8px 14px;border:0;border-radius:8px;cursor:pointer;">📋 Copy Selected (centang)</button>
@@ -8184,17 +8179,14 @@ async function runAvailCheck() {
           const badgeStyle = 'padding:2px 8px;border-radius:6px;font-size:11px;color:white;user-select:none;display:inline-block;';
           const badge = r.status === 'available'
             ? `<span style="${badgeStyle}background:#10b981;">🟢 AVAILABLE</span>`
-            : r.status === 'registered'
-              ? `<span style="${badgeStyle}background:#94a3b8;">🔴 Registered</span>`
-              : `<span style="${badgeStyle}background:#f59e0b;">⚠️ Unknown</span>`;
+            : `<span style="${badgeStyle}background:#94a3b8;">🔴 Registered</span>`;
           const markBtns = `<span style="margin-left:6px;display:inline-flex;gap:2px;">
             <button onclick="availSetStatus('${r.domain}','available')" title="Mark Available" style="background:${r.status==='available'?'#10b981':'rgba(16,185,129,0.3)'};color:white;border:0;width:22px;height:22px;border-radius:5px;cursor:pointer;font-size:11px;">🟢</button>
             <button onclick="availSetStatus('${r.domain}','registered')" title="Mark Registered" style="background:${r.status==='registered'?'#94a3b8':'rgba(148,163,184,0.3)'};color:white;border:0;width:22px;height:22px;border-radius:5px;cursor:pointer;font-size:11px;">🔴</button>
-            <button onclick="availSetStatus('${r.domain}','unknown')" title="Mark Unknown" style="background:${r.status==='unknown'?'#f59e0b':'rgba(245,158,11,0.3)'};color:white;border:0;width:22px;height:22px;border-radius:5px;cursor:pointer;font-size:11px;">⚠️</button>
           </span>`;
           const ncUrl = `https://www.namecheap.com/domains/registration/results/?domain=${encodeURIComponent(r.domain)}`;
-          const btnLabel = r.status === 'available' ? '🛒 Buy' : r.status === 'registered' ? '🔍 Cek NC' : '🔍 Verify';
-          const btnBg = r.status === 'available' ? '#10b981' : r.status === 'registered' ? '#6366f1' : '#f59e0b';
+          const btnLabel = r.status === 'available' ? '🛒 Buy' : '🔍 Cek NC';
+          const btnBg = r.status === 'available' ? '#10b981' : '#6366f1';
           const verifyBtn = `<a href="${ncUrl}" target="_blank" style="background:${btnBg};color:white;padding:3px 10px;font-size:11px;text-decoration:none;border-radius:6px;font-weight:700;">${btnLabel}</a>`;
           const copyBtn = `<button onclick="navigator.clipboard.writeText('${r.domain}').then(()=>toast('📋 ${r.domain} copied','success',1500))" style="background:#475569;color:white;padding:3px 8px;font-size:11px;border:0;border-radius:6px;cursor:pointer;font-weight:700;margin-left:4px;" title="Copy domain">📋</button>`;
           return `<tr><td><input type="checkbox" class="avail-check" data-domain="${r.domain}" data-status="${r.status}" style="margin-right:6px;"><b>${r.domain}</b></td><td>${badge}${markBtns}</td><td>${verifyBtn} ${copyBtn}</td></tr>`;
@@ -8223,28 +8215,25 @@ function availToggleStatus(domain) {
   const idx = results.findIndex(r => r.domain === domain);
   if (idx < 0) return;
   const cur = results[idx].status;
-  const next = cur === 'unknown' ? 'available' : cur === 'available' ? 'registered' : 'unknown';
+  const next = cur === 'available' ? 'registered' : 'available';
   availSetStatus(domain, next);
 }
 
 function refreshAvailResultTable(results) {
-  let available = 0, registered = 0, unknown = 0;
+  let available = 0, registered = 0;
   results.forEach(r => {
     if (r.status === 'available') available++;
-    else if (r.status === 'registered') registered++;
-    else unknown++;
+    else registered++;
   });
   // Trigger ulang render UI dengan logic yg sama (extract dari runAvailCheck)
   const total = results.length;
   document.getElementById('availResult').innerHTML = `
     <div style="background:rgba(16,185,129,0.1);padding:10px;border-radius:8px;margin-bottom:10px;font-size:13px;">
-      ✅ Selesai: 🟢 <b>${available} available</b> · 🔴 ${registered} registered · ⚠️ ${unknown} unknown
+      ✅ Selesai: 🟢 <b>${available} available</b> · 🔴 ${registered} registered
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
       ${available > 0 ? `<button onclick="availImportToDashboard()" class="btn-success" style="font-weight:700;">📥 Import ${available} Available ke Dashboard</button>` : ''}
       ${available > 0 ? `<button onclick="availCopyByStatus('available')" style="background:#10b981;color:white;font-weight:700;padding:8px 14px;border:0;border-radius:8px;cursor:pointer;">📋 Copy ${available} Available</button>` : ''}
-      ${unknown > 0 ? `<button onclick="availOpenAllNamecheap('unknown')" class="btn-warn" style="font-weight:700;">🔍 Cek ${unknown} Unknown di Namecheap (max 20 tab)</button>` : ''}
-      ${unknown > 0 ? `<button onclick="availCopyByStatus('unknown')" style="background:#f59e0b;color:white;font-weight:700;padding:8px 14px;border:0;border-radius:8px;cursor:pointer;">📋 Copy ${unknown} Unknown</button>` : ''}
       ${registered > 0 ? `<button onclick="availOpenAllNamecheap('registered')" style="background:#6366f1;color:white;font-weight:700;padding:8px 14px;border:0;border-radius:8px;cursor:pointer;">🔍 Cek ${registered} Registered (max 20)</button>` : ''}
       ${registered > 0 ? `<button onclick="availCopyByStatus('registered')" style="background:#94a3b8;color:white;font-weight:700;padding:8px 14px;border:0;border-radius:8px;cursor:pointer;">📋 Copy ${registered} Registered</button>` : ''}
       <button onclick="availCopySelected()" style="background:#475569;color:white;font-weight:700;padding:8px 14px;border:0;border-radius:8px;cursor:pointer;">📋 Copy Selected</button>
@@ -8258,18 +8247,15 @@ function refreshAvailResultTable(results) {
           const manual = r.manualSet ? ' ✏️' : '';
           const badge = r.status === 'available'
             ? `<span style="${badgeStyle}background:#10b981;">🟢 AVAILABLE${manual}</span>`
-            : r.status === 'registered'
-              ? `<span style="${badgeStyle}background:#94a3b8;">🔴 Registered${manual}</span>`
-              : `<span style="${badgeStyle}background:#f59e0b;">⚠️ Unknown</span>`;
-          // Per-row mark buttons: mark available / registered / unknown
+            : `<span style="${badgeStyle}background:#94a3b8;">🔴 Registered${manual}</span>`;
+          // Per-row mark buttons: mark available / registered (binary)
           const markBtns = `<span style="margin-left:6px;display:inline-flex;gap:2px;">
             <button onclick="availSetStatus('${r.domain}','available')" title="Mark Available" style="background:${r.status==='available'?'#10b981':'rgba(16,185,129,0.3)'};color:white;border:0;width:22px;height:22px;border-radius:5px;cursor:pointer;font-size:11px;">🟢</button>
             <button onclick="availSetStatus('${r.domain}','registered')" title="Mark Registered" style="background:${r.status==='registered'?'#94a3b8':'rgba(148,163,184,0.3)'};color:white;border:0;width:22px;height:22px;border-radius:5px;cursor:pointer;font-size:11px;">🔴</button>
-            <button onclick="availSetStatus('${r.domain}','unknown')" title="Mark Unknown" style="background:${r.status==='unknown'?'#f59e0b':'rgba(245,158,11,0.3)'};color:white;border:0;width:22px;height:22px;border-radius:5px;cursor:pointer;font-size:11px;">⚠️</button>
           </span>`;
           const ncUrl = `https://www.namecheap.com/domains/registration/results/?domain=${encodeURIComponent(r.domain)}`;
-          const btnLabel = r.status === 'available' ? '🛒 Buy' : r.status === 'registered' ? '🔍 Cek NC' : '🔍 Verify';
-          const btnBg = r.status === 'available' ? '#10b981' : r.status === 'registered' ? '#6366f1' : '#f59e0b';
+          const btnLabel = r.status === 'available' ? '🛒 Buy' : '🔍 Cek NC';
+          const btnBg = r.status === 'available' ? '#10b981' : '#6366f1';
           const verifyBtn = `<a href="${ncUrl}" target="_blank" style="background:${btnBg};color:white;padding:3px 10px;font-size:11px;text-decoration:none;border-radius:6px;font-weight:700;">${btnLabel}</a>`;
           const copyBtn = `<button onclick="navigator.clipboard.writeText('${r.domain}').then(()=>toast('📋 ${r.domain} copied','success',1500))" style="background:#475569;color:white;padding:3px 8px;font-size:11px;border:0;border-radius:6px;cursor:pointer;font-weight:700;margin-left:4px;" title="Copy domain">📋</button>`;
           return `<tr><td><input type="checkbox" class="avail-check" data-domain="${r.domain}" data-status="${r.status}" style="margin-right:6px;"><b>${r.domain}</b></td><td>${badge}${markBtns}</td><td>${verifyBtn} ${copyBtn}</td></tr>`;
