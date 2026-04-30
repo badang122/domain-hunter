@@ -2017,19 +2017,19 @@ domain3.net
   <div id="expStatusBar" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;align-items:center;">
     <span style="font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-right:6px;">📅 Status Expired:</span>
     <button class="exp-pill" data-exp="safe"     onclick="filterByExpStatus('safe')"     title="Aman — masih > 90 hari">
-      <span style="color:#6ee7b7;">Safe</span> <b id="expCntSafe" style="color:#6ee7b7;">0</b>
+      <span style="color:#6ee7b7;">✅ aman</span> <b id="expCntSafe" style="color:#6ee7b7;">0</b>
     </button>
-    <button class="exp-pill" data-exp="warning"  onclick="filterByExpStatus('warning')"  title="Warning — 30-90 hari lagi">
-      <span style="color:#fcd34d;">Warning</span> <b id="expCntWarn" style="color:#fcd34d;">0</b>
+    <button class="exp-pill" data-exp="warning"  onclick="filterByExpStatus('warning')"  title="Warning — 31-90 hari lagi">
+      <span style="color:#fcd34d;">⚠️ warning</span> <b id="expCntWarn" style="color:#fcd34d;">0</b>
     </button>
     <button class="exp-pill" data-exp="urgent"   onclick="filterByExpStatus('urgent')"   title="Urgent — ≤30 hari lagi">
-      <span style="color:#fca5a5;">Urgent</span> <b id="expCntUrgent" style="color:#fca5a5;">0</b>
+      <span style="color:#fca5a5;">🚨 urgent</span> <b id="expCntUrgent" style="color:#fca5a5;">0</b>
     </button>
     <button class="exp-pill" data-exp="expired"  onclick="filterByExpStatus('expired')"  title="Sudah lewat tanggal expired">
-      <span style="color:#a78bfa;">Expired</span> <b id="expCntExpired" style="color:#a78bfa;">0</b>
+      <span style="color:#fda4af;">💀 expired</span> <b id="expCntExpired" style="color:#fda4af;">0</b>
     </button>
     <button class="exp-pill" data-exp="incomplete" onclick="filterByExpStatus('incomplete')" title="Belum ada tanggal expired">
-      <span style="color:#94a3b8;">Belum Lengkap</span> <b id="expCntIncomplete" style="color:#94a3b8;">0</b>
+      <span style="color:#94a3b8;">— belum lengkap</span> <b id="expCntIncomplete" style="color:#94a3b8;">0</b>
     </button>
     <button class="exp-pill" data-exp="all" onclick="filterByExpStatus('all')" style="margin-left:auto;color:var(--muted);font-size:11px;">✕ Reset filter</button>
   </div>
