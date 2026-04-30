@@ -639,6 +639,25 @@
     text-transform: uppercase;
   }
 
+  /* Expiry status pills */
+  .exp-pill {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.15s ease;
+  }
+  .exp-pill:hover { background: var(--panel-hover); transform: translateY(-1px); }
+  .exp-pill.active { background: rgba(99,102,241,0.15); border-color: rgba(99,102,241,0.5); box-shadow: 0 0 0 2px rgba(99,102,241,0.15); }
+  .exp-pill b { font-size: 13px; }
+
   .col-toggle { display: inline-flex; align-items: center; gap: 6px; margin-right: 10px; font-size: 12px; }
   .col-toggle input { width: auto; min-width: 0; padding: 0; margin: 0; }
 
@@ -1985,6 +2004,27 @@ domain3.net
     <div class="stat-card"><div class="stat-label">By Status</div><div style="font-size:12px;">—</div></div>
   </div>
 
+  <!-- Expiry Status Pills — auto-categorize by expiry date -->
+  <div id="expStatusBar" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;align-items:center;">
+    <span style="font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-right:6px;">📅 Status Expired:</span>
+    <button class="exp-pill" data-exp="safe"     onclick="filterByExpStatus('safe')"     title="Aman — masih > 90 hari">
+      <span style="color:#6ee7b7;">Safe</span> <b id="expCntSafe" style="color:#6ee7b7;">0</b>
+    </button>
+    <button class="exp-pill" data-exp="warning"  onclick="filterByExpStatus('warning')"  title="Warning — 30-90 hari lagi">
+      <span style="color:#fcd34d;">Warning</span> <b id="expCntWarn" style="color:#fcd34d;">0</b>
+    </button>
+    <button class="exp-pill" data-exp="urgent"   onclick="filterByExpStatus('urgent')"   title="Urgent — ≤30 hari lagi">
+      <span style="color:#fca5a5;">Urgent</span> <b id="expCntUrgent" style="color:#fca5a5;">0</b>
+    </button>
+    <button class="exp-pill" data-exp="expired"  onclick="filterByExpStatus('expired')"  title="Sudah lewat tanggal expired">
+      <span style="color:#a78bfa;">Expired</span> <b id="expCntExpired" style="color:#a78bfa;">0</b>
+    </button>
+    <button class="exp-pill" data-exp="incomplete" onclick="filterByExpStatus('incomplete')" title="Belum ada tanggal expired">
+      <span style="color:#94a3b8;">Belum Lengkap</span> <b id="expCntIncomplete" style="color:#94a3b8;">0</b>
+    </button>
+    <button class="exp-pill" data-exp="all" onclick="filterByExpStatus('all')" style="margin-left:auto;color:var(--muted);font-size:11px;">✕ Reset filter</button>
+  </div>
+
   <div class="panel">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
       <h3 style="font-size:15px;margin:0;display:flex;align-items:center;gap:8px;">
@@ -2643,6 +2683,8 @@ function updateStats() {
     <div class="stat-card"><div class="stat-label">High Score (≥40)</div><div class="stat-value good">${formatID(highScore)}</div></div>
     <div class="stat-card"><div class="stat-label">By Status</div><div style="font-size:12px;">${Object.entries(byStatus).map(([k,v])=>`<span class="tag tag-${k}">${k}:${formatID(v)}</span>`).join(' ')}</div></div>
   `;
+  // Sekalian update count expiry status pills
+  if (typeof updateExpStatusCounts === 'function') updateExpStatusCounts();
 }
 
 function applyFilters() {
@@ -2698,17 +2740,65 @@ function applyFilters() {
       const tags = (meta.tags || '').split(',').map(t=>t.trim().toLowerCase()).filter(Boolean);
       if (!tags.includes(activeTagFilter.toLowerCase())) return false;
     }
-    // Expiry filter
-    if (activeExpiryFilter) {
-      const meta = JSON.parse(localStorage.getItem('dashboard_meta') || '{}')[d.domain] || {};
-      if (!meta.expiryDate) return false;
-      const days = Math.round((new Date(meta.expiryDate) - new Date()) / 86400000);
-      if (days > 30) return false;
+    // Expiry filter — 5 kategori berdasarkan tanggal expired
+    if (activeExpiryFilter && activeExpiryFilter !== 'all' && activeExpiryFilter !== true) {
+      const cat = computeExpiryCategory(d);
+      if (cat !== activeExpiryFilter) return false;
+    } else if (activeExpiryFilter === true) {
+      // Backward compat: legacy boolean filter = urgent saja (≤30 hari)
+      const cat = computeExpiryCategory(d);
+      if (cat !== 'urgent' && cat !== 'expired') return false;
     }
     return true;
   });
   applySort();
   render();
+  updateExpStatusCounts();
+}
+
+// Hitung kategori expiry untuk satu domain berdasarkan tanggal expired
+function computeExpiryCategory(d) {
+  const meta = JSON.parse(localStorage.getItem('dashboard_meta') || '{}')[d.domain] || {};
+  const exp = d.expiryDate || meta.expiryDate || '';
+  if (!exp) return 'incomplete';
+  const dt = new Date(exp);
+  if (isNaN(dt.getTime())) return 'incomplete';
+  const days = Math.round((dt - new Date()) / 86400000);
+  if (days < 0) return 'expired';
+  if (days <= 30) return 'urgent';
+  if (days <= 90) return 'warning';
+  return 'safe';
+}
+
+// Update counter pada pill expiry status (hitung dari allData)
+function updateExpStatusCounts() {
+  const counts = { safe: 0, warning: 0, urgent: 0, expired: 0, incomplete: 0 };
+  if (typeof allData !== 'undefined' && Array.isArray(allData)) {
+    for (const d of allData) {
+      counts[computeExpiryCategory(d)]++;
+    }
+  }
+  const setN = (id, n) => { const el = document.getElementById(id); if (el) el.textContent = n; };
+  setN('expCntSafe', counts.safe);
+  setN('expCntWarn', counts.warning);
+  setN('expCntUrgent', counts.urgent);
+  setN('expCntExpired', counts.expired);
+  setN('expCntIncomplete', counts.incomplete);
+}
+
+// Set filter aktif ke kategori tertentu (atau 'all' untuk reset)
+function filterByExpStatus(cat) {
+  activeExpiryFilter = (cat === 'all') ? false : cat;
+  // Update tombol active state
+  document.querySelectorAll('.exp-pill').forEach(b => b.classList.remove('active'));
+  if (cat !== 'all') {
+    const btn = document.querySelector(`.exp-pill[data-exp="${cat}"]`);
+    if (btn) btn.classList.add('active');
+  }
+  applyFilters();
+  if (cat !== 'all' && typeof toast === 'function') {
+    toast(`📅 Filter: ${cat}`, 'info', 1500);
+  }
 }
 
 function applySort() {
