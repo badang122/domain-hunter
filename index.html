@@ -396,6 +396,11 @@
   .tag-buying { background: rgba(139,92,246,0.15); color: #c4b5fd; border: 1px solid rgba(139,92,246,0.3); }
   .tag-owned { background: rgba(16,185,129,0.15); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.3); }
   .tag-reject { background: rgba(239,68,68,0.15); color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); }
+  /* Auto-status dari tanggal expired */
+  .tag-aman    { background: rgba(16,185,129,0.18); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.4); }
+  .tag-warning { background: rgba(251,191,36,0.18); color: #fcd34d; border: 1px solid rgba(251,191,36,0.4); }
+  .tag-urgent  { background: rgba(239,68,68,0.18);  color: #fca5a5; border: 1px solid rgba(239,68,68,0.4); }
+  .tag-expired { background: rgba(127,29,29,0.40);  color: #fda4af; border: 1px solid rgba(225,29,72,0.5); }
 
   /* Login */
   .login-overlay {
@@ -727,6 +732,10 @@
   .tag-buying { color: #c4b5fd !important; }
   .tag-owned { color: #6ee7b7 !important; }
   .tag-reject { color: #fca5a5 !important; }
+  .tag-aman { color: #6ee7b7 !important; }
+  .tag-warning { color: #fcd34d !important; }
+  .tag-urgent { color: #fca5a5 !important; }
+  .tag-expired { color: #fda4af !important; }
   .fav-star:not(.active) { color: #cbd5e1 !important; }
   .fav-star.active { color: #fbbf24 !important; }
   .login-error { color: #ef4444 !important; }
@@ -2493,8 +2502,26 @@ function saveMeta(domain, updates) {
 }
 
 function renderStatus(d) {
+  // Auto-status berdasarkan tanggal expired:
+  // - Expired      : sudah lewat tanggal
+  // - Urgent       : ≤ 30 hari lagi
+  // - Warning      : 31-90 hari lagi
+  // - Aman         : > 90 hari lagi
+  // - Belum di-set : fallback ke manual status (new/buying/owned/dst)
+  const cat = (typeof computeExpiryCategory === 'function') ? computeExpiryCategory(d) : 'incomplete';
+  if (cat !== 'incomplete') {
+    const labelMap = {
+      safe:    { text: 'aman',    cls: 'tag-aman',    icon: '✅' },
+      warning: { text: 'warning', cls: 'tag-warning', icon: '⚠️' },
+      urgent:  { text: 'urgent',  cls: 'tag-urgent',  icon: '🚨' },
+      expired: { text: 'expired', cls: 'tag-expired', icon: '💀' },
+    };
+    const m = labelMap[cat];
+    return `<span class="tag ${m.cls}" onclick="changeStatus('${d.domain}')" style="cursor:pointer;" title="Auto dari tanggal expired — klik untuk ganti manual">${m.icon} ${m.text}</span>`;
+  }
+  // Belum ada tanggal expired → tampilkan manual status (deal pipeline)
   const s = d.status || 'new';
-  return `<span class="tag tag-${s}" onclick="changeStatus('${d.domain}')" style="cursor:pointer;" title="Click to change">${s}</span>`;
+  return `<span class="tag tag-${s}" onclick="changeStatus('${d.domain}')" style="cursor:pointer;" title="Set tanggal expired untuk auto-status. Klik untuk ganti manual">${s}</span>`;
 }
 
 function renderNotes(d) {
