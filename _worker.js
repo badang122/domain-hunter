@@ -131,6 +131,67 @@ export default {
       }
     }
 
+    // ════════════════════════════════════════════════════════════════
+    // GitHub Gist proxy — token disimpan di env.GIST_TOKEN (server-side)
+    // Endpoint:
+    //   GET  /api/gist           → fetch gist content (read sync data)
+    //   POST /api/gist           → update gist content (push sync data)
+    //   GET  /api/gist/meta      → fetch updated_at timestamp (cek freshness)
+    // ════════════════════════════════════════════════════════════════
+    if (url.pathname.startsWith('/api/gist')) {
+      const token = env.GIST_TOKEN;
+      const gid = env.GIST_ID;
+      if (!token || !gid) {
+        return jsonResp({ error: 'GIST_TOKEN / GIST_ID belum di-set di CF Pages env vars' }, 500);
+      }
+      const ghHeaders = {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/vnd.github+json',
+        'User-Agent': 'domain-hunter-dashboard'
+      };
+      try {
+        // META: cuma return updated_at (lightweight check kalau Gist lebih baru dari local)
+        if (url.pathname === '/api/gist/meta') {
+          const r = await fetch(`https://api.github.com/gists/${gid}`, { headers: ghHeaders });
+          if (!r.ok) return jsonResp({ error: `gist meta http ${r.status}` }, r.status);
+          const j = await r.json();
+          return jsonResp({ updated_at: j.updated_at, files: Object.keys(j.files || {}) });
+        }
+        // GET: return file content (untuk pull)
+        if (url.pathname === '/api/gist' && request.method === 'GET') {
+          const r = await fetch(`https://api.github.com/gists/${gid}`, { headers: ghHeaders });
+          if (!r.ok) return jsonResp({ error: `gist get http ${r.status}` }, r.status);
+          const j = await r.json();
+          const filename = 'domain-hunter-data.json';
+          const file = j.files[filename] || Object.values(j.files)[0];
+          if (!file) return jsonResp({ error: 'gist file kosong' }, 404);
+          // Return file content + metadata
+          return jsonResp({ content: file.content, updated_at: j.updated_at, filename: file.filename });
+        }
+        // POST/PATCH: update gist (untuk push)
+        if (url.pathname === '/api/gist' && (request.method === 'POST' || request.method === 'PATCH')) {
+          const body = await request.json();
+          const filename = body.filename || 'domain-hunter-data.json';
+          const content = body.content;
+          if (!content) return jsonResp({ error: 'missing content' }, 400);
+          const r = await fetch(`https://api.github.com/gists/${gid}`, {
+            method: 'PATCH',
+            headers: { ...ghHeaders, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ files: { [filename]: { content } } })
+          });
+          if (!r.ok) {
+            const errText = await r.text();
+            return jsonResp({ error: `gist patch http ${r.status}`, detail: errText.slice(0, 500) }, r.status);
+          }
+          const j = await r.json();
+          return jsonResp({ ok: true, updated_at: j.updated_at, gist_id: j.id });
+        }
+        return jsonResp({ error: 'method not allowed' }, 405);
+      } catch (e) {
+        return jsonResp({ error: String(e) }, 500);
+      }
+    }
+
     if (request.method === 'OPTIONS') {
       return new Response(null, {
         headers: {

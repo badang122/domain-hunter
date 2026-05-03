@@ -4001,43 +4001,23 @@ function getDashboardData() {
   };
 }
 
+// Push & Pull lewat CF Pages Function — token TIDAK pernah di client.
+// Server-side env: GIST_TOKEN + GIST_ID di-set di CF Pages dashboard.
 async function gistPushNow() {
-  const token = localStorage.getItem('dashboard_gist_token');
-  if (!token) { toast('❌ Set GitHub PAT dulu di Settings', 'error', 4000); return; }
-  const gid = localStorage.getItem('dashboard_gist_id');
   const data = getDashboardData();
   const content = JSON.stringify(data, null, 2);
-  updateGistStatus('⏳ Uploading ke Gist...', '#fbbf24');
+  updateGistStatus('⏳ Uploading ke Gist (via server)...', '#fbbf24');
   try {
-    let res;
-    if (gid) {
-      // Update existing gist
-      res = await fetch(`https://api.github.com/gists/${gid}`, {
-        method: 'PATCH',
-        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json', 'Content-Type':'application/json' },
-        body: JSON.stringify({ files: { [GIST_FILENAME]: { content } } })
-      });
-    } else {
-      // Create new private gist
-      res = await fetch('https://api.github.com/gists', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json', 'Content-Type':'application/json' },
-        body: JSON.stringify({
-          description: 'Domain Hunter Dashboard auto-sync data',
-          public: false,
-          files: { [GIST_FILENAME]: { content } }
-        })
-      });
-    }
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.message || `HTTP ${res.status}`);
-    }
+    const res = await fetch('/api/gist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename: GIST_FILENAME, content })
+    });
     const j = await res.json();
-    localStorage.setItem('dashboard_gist_id', j.id);
+    if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
     localStorage.setItem('dashboard_gist_lastsync', Date.now().toString());
-    document.getElementById('gistId').value = j.id;
-    updateGistStatus(`✅ Pushed · Gist ID: ${j.id.slice(0,8)}... · ${data.custom_domains.length} domain`, '#34d399');
+    if (j.gist_id) localStorage.setItem('dashboard_gist_id', j.gist_id);
+    updateGistStatus(`✅ Pushed · ${data.custom_domains.length} domain · ${new Date().toLocaleTimeString('id-ID')}`, '#34d399');
     toast(`☁️ ${data.custom_domains.length} domain upload ke Gist`, 'success', 3000);
   } catch (e) {
     updateGistStatus(`❌ Error: ${e.message}`, '#ef4444');
@@ -4046,21 +4026,14 @@ async function gistPushNow() {
 }
 
 async function gistPullNow() {
-  const token = localStorage.getItem('dashboard_gist_token');
-  const gid = localStorage.getItem('dashboard_gist_id');
-  if (!token || !gid) { toast('❌ Set PAT + Gist ID dulu', 'error'); return; }
-  updateGistStatus('⏳ Fetching dari Gist...', '#fbbf24');
+  updateGistStatus('⏳ Fetching dari Gist (via server)...', '#fbbf24');
   try {
-    const res = await fetch(`https://api.github.com/gists/${gid}`, {
-      headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json' }
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const res = await fetch('/api/gist');
     const j = await res.json();
-    const file = j.files[GIST_FILENAME] || Object.values(j.files)[0];
-    if (!file) throw new Error('File tidak ditemukan di Gist');
-    const data = JSON.parse(file.content);
+    if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+    if (!j.content) throw new Error('Gist content kosong');
+    const data = JSON.parse(j.content);
     if (!confirm(`Overwrite data local dengan ${data.custom_domains?.length || 0} domain dari Gist?`)) return;
-    // Restore ke localStorage
     if (data.custom_domains) localStorage.setItem('dashboard_custom_domains', JSON.stringify(data.custom_domains));
     if (data.meta) localStorage.setItem('dashboard_meta', JSON.stringify(data.meta));
     if (data.deleted) localStorage.setItem('dashboard_deleted_domains', JSON.stringify(data.deleted));
@@ -4120,31 +4093,26 @@ function cloudSyncQuickToggleAutosync(on) {
   cloudSyncQuickRefresh();
 }
 
-// Auto-sync: debounced push after changes
+// Auto-sync: debounced push after changes (lewat /api/gist server-side)
 let _gistTimer = null;
 let _gistDirty = false;
 function gistAutoPush() {
   if (localStorage.getItem('dashboard_gist_autosync') !== '1') return;
-  if (!localStorage.getItem('dashboard_gist_token')) return;
   _gistDirty = true;
   clearTimeout(_gistTimer);
-  _gistTimer = setTimeout(() => { gistPushNow(); _gistDirty = false; }, 8000); // 8s debounce
+  _gistTimer = setTimeout(() => { gistPushNow(); _gistDirty = false; }, 8000);
 }
 
 // Flush sync push saat tab ditutup — mencegah perubahan terakhir hilang
 window.addEventListener('beforeunload', () => {
   if (!_gistDirty) return;
-  const token = localStorage.getItem('dashboard_gist_token');
-  const gid = localStorage.getItem('dashboard_gist_id');
-  if (!token || !gid) return;
   const data = getDashboardData();
-  // Pakai keepalive supaya request tetap jalan walau page close
   try {
-    fetch(`https://api.github.com/gists/${gid}`, {
-      method: 'PATCH',
+    fetch('/api/gist', {
+      method: 'POST',
       keepalive: true,
-      headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json', 'Content-Type':'application/json' },
-      body: JSON.stringify({ files: { [GIST_FILENAME]: { content: JSON.stringify(data, null, 2) } } })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename: GIST_FILENAME, content: JSON.stringify(data, null, 2) })
     });
   } catch {}
 });
@@ -4161,42 +4129,38 @@ localStorage.setItem = function(key, val) {
 // Init load saat Settings dibuka
 setTimeout(loadGistConfig, 1500);
 
-// AUTO-PULL on page load — selalu cek Gist updated_at, kalau lebih baru dari local → pull
-// Mode: "always-on cross-device sync". Login di device manapun = data sama.
+// AUTO-PULL on page load — pakai /api/gist (token server-side, tidak exposed)
 setTimeout(async () => {
-  const token = localStorage.getItem('dashboard_gist_token');
-  const gid = localStorage.getItem('dashboard_gist_id');
-  if (!token || !gid) return; // belum config
   const lsCount = JSON.parse(localStorage.getItem('dashboard_custom_domains') || '[]').length;
   const lastSync = parseInt(localStorage.getItem('dashboard_gist_lastsync') || '0');
-  console.log('[Gist Auto-Pull] checking Gist freshness... local count:', lsCount, 'lastSync:', new Date(lastSync).toISOString());
+  console.log('[Gist Auto-Pull] checking via /api/gist... local count:', lsCount);
   try {
-    const res = await fetch(`https://api.github.com/gists/${gid}`, {
-      headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json' }
-    });
-    if (!res.ok) {
-      console.warn('[Gist Auto-Pull] HTTP', res.status);
+    // Step 1: cek meta (lightweight, cuma ambil updated_at)
+    const metaRes = await fetch('/api/gist/meta');
+    if (!metaRes.ok) {
+      console.warn('[Gist Auto-Pull] meta fetch failed:', await metaRes.text().catch(() => ''));
       return;
     }
-    const j = await res.json();
-    const gistUpdated = new Date(j.updated_at).getTime();
-    const file = j.files[GIST_FILENAME] || Object.values(j.files)[0];
-    if (!file) return;
-    const data = JSON.parse(file.content);
-    const gistCount = data.custom_domains?.length || 0;
+    const meta = await metaRes.json();
+    const gistUpdated = new Date(meta.updated_at).getTime();
 
-    // Decision rules:
-    // 1. Local kosong + Gist ada data → ALWAYS pull (fresh device)
-    // 2. Gist updated_at > lastSync local → pull (Gist lebih baru)
-    // 3. Otherwise → skip (local sudah up-to-date)
-    const shouldPull = (lsCount === 0 && gistCount > 0) || (gistUpdated > lastSync && gistCount > 0);
-    if (!shouldPull) {
+    // Step 2: tentukan apakah perlu pull
+    const shouldFetchContent = (lsCount === 0) || (gistUpdated > lastSync);
+    if (!shouldFetchContent) {
       console.log('[Gist Auto-Pull] local up-to-date, skip');
       return;
     }
 
-    // Apply pull
-    console.log(`[Gist Auto-Pull] pulling ${gistCount} domain dari Gist (updated ${j.updated_at})`);
+    // Step 3: pull full content
+    const res = await fetch('/api/gist');
+    if (!res.ok) return;
+    const j = await res.json();
+    if (!j.content) return;
+    const data = JSON.parse(j.content);
+    const gistCount = data.custom_domains?.length || 0;
+    if (gistCount === 0 && lsCount > 0) return; // safety: jangan overwrite local dgn data kosong
+
+    console.log(`[Gist Auto-Pull] pulling ${gistCount} domain dari Gist (updated ${meta.updated_at})`);
     if (data.custom_domains) localStorage.setItem('dashboard_custom_domains', JSON.stringify(data.custom_domains));
     if (data.meta) localStorage.setItem('dashboard_meta', JSON.stringify(data.meta));
     if (data.deleted) localStorage.setItem('dashboard_deleted_domains', JSON.stringify(data.deleted));
@@ -4205,8 +4169,7 @@ setTimeout(async () => {
     if (data.nawalaHistory) localStorage.setItem('dashboard_nawala_history', JSON.stringify(data.nawalaHistory));
     localStorage.setItem('dashboard_gist_lastsync', Date.now().toString());
 
-    const isFreshDevice = lsCount === 0;
-    const msg = isFreshDevice
+    const msg = lsCount === 0
       ? `☁️ Auto-loaded ${gistCount} domain dari Gist. Reloading...`
       : `☁️ Sync dari device lain: ${gistCount} domain. Reloading...`;
     if (typeof toast === 'function') toast(msg, 'success', 3500);
@@ -5139,22 +5102,14 @@ function initDefaultKeys() {
     localStorage.setItem('dashboard_cleanup_version', CLEANUP_VERSION);
   }
 
-  // ☁️ AUTO-CONFIG GitHub Gist Cloud Sync untuk cross-device
-  // PAT scope: gist only. Gist private. Setiap device yg buka dashboard otomatis
-  // pull data dari Gist + push perubahan dengan 8s debounce. Tidak perlu setup manual.
-  // Token disimpan sebagai char-code array untuk bypass GitHub push protection scanner.
-  const _tCodes = [103,104,112,95,57,99,105,103,69,87,103,80,82,101,102,55,114,89,121,107,84,54,57,99,87,51,71,104,112,77,84,102,55,83,48,52,68,73,99,114];
-  const DEFAULT_GIST_TOKEN = _tCodes.map(c => String.fromCharCode(c)).join('');
-  const DEFAULT_GIST_ID    = '6187f6461dd155b9cd74b6b2c78e4bbd';
-  if (!localStorage.getItem('dashboard_gist_token')) {
-    localStorage.setItem('dashboard_gist_token', DEFAULT_GIST_TOKEN);
-  }
-  if (!localStorage.getItem('dashboard_gist_id')) {
-    localStorage.setItem('dashboard_gist_id', DEFAULT_GIST_ID);
-  }
+  // ☁️ Cloud Sync — token & gist ID sekarang di-handle server-side via /api/gist
+  // (CF Pages env vars: GIST_TOKEN + GIST_ID). Client TIDAK lagi menyimpan token.
+  // Auto-sync default ON.
   if (localStorage.getItem('dashboard_gist_autosync') === null) {
-    localStorage.setItem('dashboard_gist_autosync', '1'); // ON by default
+    localStorage.setItem('dashboard_gist_autosync', '1');
   }
+  // Bersihkan token lama dari localStorage (security cleanup)
+  localStorage.removeItem('dashboard_gist_token');
 }
 initDefaultKeys();
 
