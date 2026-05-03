@@ -783,14 +783,30 @@
   .fav-star:not(.active) { color: #cbd5e1 !important; }
   .fav-star.active { color: #fbbf24 !important; }
   .login-error { color: #ef4444 !important; }
-  .stat-value, .stat-value * {
+  /* Stat value text — putih di dark mode saja */
+  body:not(.light) .stat-value, body:not(.light) .stat-value * {
     color: #ffffff !important;
     -webkit-text-fill-color: #ffffff !important;
     background: none !important;
   }
-  /* Labels & muted text jadi putih */
-  .stat-label, .filter-label, .caption-muted, .subtitle, .hint,
-  .shortcut-desc, .section-title { color: #ffffff !important; }
+  /* Light mode: stat-value harus dark text — kalahkan webkit-text-fill */
+  body.light .stat-value, body.light .stat-value * {
+    color: #0f172a !important;
+    -webkit-text-fill-color: #0f172a !important;
+  }
+  body.light .stat-value.good, body.light .stat-value.good * {
+    color: #047857 !important;
+    -webkit-text-fill-color: #047857 !important;
+  }
+  body.light .stat-value.bad, body.light .stat-value.bad * {
+    color: #b91c1c !important;
+    -webkit-text-fill-color: #b91c1c !important;
+  }
+  /* Labels & muted text — putih di dark, slate di light */
+  body:not(.light) .stat-label, body:not(.light) .filter-label,
+  body:not(.light) .caption-muted, body:not(.light) .subtitle,
+  body:not(.light) .hint, body:not(.light) .shortcut-desc,
+  body:not(.light) .section-title { color: #ffffff !important; }
 
   /* Music Player */
   .music-player {
