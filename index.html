@@ -3253,10 +3253,10 @@ async function autoGenerateAllNawala() {
     return;
   }
 
-  const BATCH_SIZE = 30; // Skiddle bulk API max
+  const BATCH_SIZE = 50; // Server-side endpoint /api/check-nawala-bulk max
   const totalBatches = Math.ceil(unchecked.length / BATCH_SIZE);
-  const estSec = Math.ceil(totalBatches * 2.5);
-  if (!confirm(`🚀 Auto-Generate Nawala via Skiddle API?\n\n${unchecked.length} domain belum dicek.\nEstimasi ~${estSec} detik (${totalBatches} batch x 30 domain).\nAPI: check.skiddle.id (server-side cek vs Trust Positif)\n\nLanjut?`)) return;
+  const estSec = Math.ceil(totalBatches * 3);
+  if (!confirm(`🚀 Auto-Generate Nawala (Multi-Source)\n\n${unchecked.length} domain akan dicek via:\n  • Skiddle API (Trust Positif Kominfo)\n  • Trust Positif scrape direct\n  • Cross-validation 2-source\n\nEstimasi ~${estSec} detik (${totalBatches} batch x 50 domain).\n\nLanjut?`)) return;
 
   const progBox = document.getElementById('nwProgress');
   const progTxt = document.getElementById('nwProgressText');
@@ -3267,23 +3267,57 @@ async function autoGenerateAllNawala() {
   const failedDomains = [];
   const started = Date.now();
 
-  // Process in batches via Skiddle bulk API
+  // PASS 1 — Server-side bulk endpoint (CF Pages Function)
+  // Worker melakukan: Skiddle bulk → fallback Skiddle single → fallback TP scrape
   for (let i = 0; i < unchecked.length; i += BATCH_SIZE) {
     const batch = unchecked.slice(i, i + BATCH_SIZE);
-    const batchResults = await checkNawalaViaSkiddleBulk(batch);
-
-    // Fallback per-domain untuk yang gagal di batch
-    for (const domain of batch) {
-      let r = batchResults[domain];
-      if (!r) {
-        // Skiddle gagal untuk domain ini, coba cara fallback
-        r = await checkNawala(domain);
+    let batchResults = {};
+    try {
+      const res = await fetch('/api/check-nawala-bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domains: batch })
+      });
+      if (res.ok) {
+        const j = await res.json();
+        for (const r of (j.results || [])) {
+          if (r.status === 'blocked' || r.status === 'safe') {
+            batchResults[r.domain] = r.status;
+          }
+        }
       }
+    } catch (e) { console.warn('[nawala] server bulk failed:', e); }
+
+    // PASS 2 — Untuk yg masih gagal di server endpoint, fallback Skiddle direct client
+    const stillFailing = batch.filter(d => !batchResults[d]);
+    if (stillFailing.length > 0) {
+      const skiddleResults = await checkNawalaViaSkiddleBulk(stillFailing);
+      for (const d of stillFailing) {
+        if (skiddleResults[d]) batchResults[d] = skiddleResults[d];
+      }
+    }
+
+    // PASS 3 — Sisanya, per-domain `checkNawala` (multi-method include DNS resolve)
+    const finalFailing = batch.filter(d => !batchResults[d]);
+    if (finalFailing.length > 0) {
+      const perDomainPromises = finalFailing.map(async d => {
+        try { return [d, await checkNawala(d)]; }
+        catch { return [d, null]; }
+      });
+      const perResults = await Promise.all(perDomainPromises);
+      for (const [d, r] of perResults) {
+        if (r === 'blocked' || r === 'safe') batchResults[d] = r;
+      }
+    }
+
+    // Save & update
+    for (const domain of batch) {
+      const r = batchResults[domain];
       if (r === 'blocked') blocked++;
       else if (r === 'safe') safe++;
       else { fail++; failedDomains.push(domain); }
       if (r) {
-        saveMeta(domain, { nawala: r });
+        saveMeta(domain, { nawala: r, nawalaCheckedAt: new Date().toISOString() });
         nwHistory[domain] = { status: r, when: new Date().toISOString() };
         const d = allData.find(x => x.domain === domain);
         if (d) d.nawala = r;
@@ -3298,26 +3332,52 @@ async function autoGenerateAllNawala() {
     localStorage.setItem('dashboard_nawala_history', JSON.stringify(nwHistory));
     updateNawalaStats();
     renderNawalaTable();
-    if (i + BATCH_SIZE < unchecked.length) await new Promise(r => setTimeout(r, 300));
+    if (i + BATCH_SIZE < unchecked.length) await new Promise(r => setTimeout(r, 400));
   }
 
-  localStorage.setItem('dashboard_nawala_history', JSON.stringify(nwHistory));
-  updateNawalaStats();
-  renderNawalaTable();
+  // PASS 4 — Retry failedDomains sekali lagi via server endpoint single
+  // (kadang first call timeout, retry biasanya jalan)
+  if (failedDomains.length > 0 && failedDomains.length <= 100) {
+    if (progTxt) progTxt.innerHTML = `🔁 Retry ${failedDomains.length} domain yg gagal...`;
+    const retryDomains = [...failedDomains];
+    failedDomains.length = 0;
+    for (const domain of retryDomains) {
+      try {
+        const res = await fetch(`/api/check-nawala?domain=${encodeURIComponent(domain)}`);
+        const j = await res.json();
+        if (j.status === 'blocked' || j.status === 'safe') {
+          saveMeta(domain, { nawala: j.status, nawalaCheckedAt: new Date().toISOString() });
+          nwHistory[domain] = { status: j.status, when: new Date().toISOString() };
+          const d = allData.find(x => x.domain === domain);
+          if (d) d.nawala = j.status;
+          if (j.status === 'blocked') blocked++; else safe++;
+          fail--;
+        } else {
+          failedDomains.push(domain);
+        }
+      } catch { failedDomains.push(domain); }
+      await new Promise(r => setTimeout(r, 100));
+    }
+    localStorage.setItem('dashboard_nawala_history', JSON.stringify(nwHistory));
+    updateNawalaStats();
+    renderNawalaTable();
+  }
+
   if (typeof render === 'function') render();
-  if (typeof logActivity === 'function') logActivity('AUTO_GEN_NAWALA', `${safe} safe, ${blocked} blocked, ${fail} fail`);
+  if (typeof logActivity === 'function') logActivity('AUTO_GEN_NAWALA', `${safe} safe, ${blocked} blocked, ${failedDomains.length} fail`);
 
   const elapsed = Math.round((Date.now() - started) / 1000);
   if (progTxt) progTxt.innerHTML =
-    `✅ Selesai dalam ${elapsed}s — 🟢 <b>${safe} aman</b> | 🔴 <b>${blocked} blokir</b> | ⚠️ ${fail} gagal`;
+    `✅ Selesai dalam ${elapsed}s — 🟢 <b>${safe} aman</b> | 🔴 <b>${blocked} blokir</b> | ⚠️ ${failedDomains.length} gagal`;
   if (progBar) progBar.style.width = '100%';
 
   let msg = `✅ Auto-Generate Nawala Selesai!\n\n` +
-    `🟢 Aman: ${safe}\n🔴 Blokir: ${blocked}\n⚠️ Gagal cek: ${fail}\n⏱️ Waktu: ${elapsed} detik`;
+    `🟢 Aman: ${safe}\n🔴 Blokir: ${blocked}\n⚠️ Gagal cek: ${failedDomains.length}\n⏱️ Waktu: ${elapsed} detik\n\n` +
+    `4-pass strategy: server bulk → Skiddle direct → checkNawala multi → retry single endpoint`;
   if (failedDomains.length > 0 && failedDomains.length <= 10) {
-    msg += `\n\nDomain gagal:\n${failedDomains.join('\n')}`;
+    msg += `\n\nDomain gagal (verify manual):\n${failedDomains.join('\n')}`;
   } else if (failedDomains.length > 10) {
-    msg += `\n\n(${failedDomains.length} domain gagal — coba Recheck manual)`;
+    msg += `\n\n(${failedDomains.length} domain gagal — coba 🇮🇩 Real Verify untuk verifikasi manual)`;
   }
   alert(msg);
 }
