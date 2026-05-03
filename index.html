@@ -112,11 +112,32 @@
   /* Hint tip at bottom */
   body.light p.hint, body.light .add-form-row + p { color: #475569 !important; }
   /* Tabel header + cells — light mode override (kalahkan solid dark hex dari dark mode) */
-  body.light th { background: #e2e8f0 !important; color: #1e1b4b !important; }
-  body.light tbody td { background: #ffffff !important; color: #1e293b !important; }
+  body.light th { background: #e2e8f0 !important; color: #1e1b4b !important; border-bottom-color: rgba(15,23,42,0.15) !important; }
+  body.light tbody td { background: #ffffff !important; color: #1e293b !important; border-bottom-color: rgba(15,23,42,0.08) !important; border-right-color: rgba(15,23,42,0.06) !important; }
   body.light tbody tr:nth-child(even) td { background: #f8fafc !important; }
   body.light tbody tr:hover td { background: #eef2ff !important; }
   body.light tbody td * { color: #1e293b; }
+  body.light table { border-color: rgba(15,23,42,0.12) !important; box-shadow: 0 1px 3px rgba(15,23,42,0.06) !important; }
+  /* Stat cards: bayangan halus + border */
+  body.light .stat-card { box-shadow: 0 1px 3px rgba(15,23,42,0.04), 0 1px 2px rgba(15,23,42,0.06) !important; }
+  body.light .stat-label { color: #64748b !important; }
+  /* Pill expiry status di light mode */
+  body.light .exp-pill { background: #ffffff !important; border-color: rgba(15,23,42,0.12) !important; color: #1e293b; }
+  body.light .exp-pill:hover { background: #f8fafc !important; }
+  body.light .exp-pill.active { background: #eef2ff !important; border-color: #6366f1 !important; }
+  /* Form section di Add Domain */
+  body.light .form-section { background: #ffffff !important; border-color: rgba(15,23,42,0.10) !important; }
+  body.light .form-section.moz    { background: #eff6ff !important; border-color: rgba(59,130,246,0.25) !important; }
+  body.light .form-section.ahrefs { background: #ecfdf5 !important; border-color: rgba(16,185,129,0.25) !important; }
+  body.light .form-section.basic  { background: #faf5ff !important; border-color: rgba(139,92,246,0.25) !important; }
+  body.light .form-section-title { color: #1e293b !important; }
+  /* Footer persist indicator */
+  body.light #persistIndicator { color: #475569 !important; }
+  /* Toast / notifikasi tetap sesuai jenis */
+  /* Modal backdrop lebih lembut */
+  body.light .modal-overlay.active { background: rgba(15,23,42,0.5) !important; }
+  /* Card stats border per-color masih bisa kelihatan */
+  body.light .stat-card::before { opacity: 1 !important; height: 4px !important; }
   /* Tag (status) di light mode — text gelap, background pucat */
   body.light .tag { color: #1e293b !important; }
   body.light .tag-aman    { background: #d1fae5 !important; color: #065f46 !important; border-color: #10b981 !important; }
@@ -276,8 +297,9 @@
     font-weight: 800;
     letter-spacing: -0.03em;
     line-height: 1;
-    color: #ffffff !important;
+    color: #f1f5f9;
   }
+  body.light .stat-value, body.light .stat-card .stat-value { color: #0f172a !important; }
 
   /* Add Icon before stat labels */
   .stat-card:nth-child(1) .stat-label::before { content: '🌐'; font-size: 14px; }
