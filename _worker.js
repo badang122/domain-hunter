@@ -26,19 +26,19 @@ function jsonResp(obj, status = 200) {
   });
 }
 
-async function fetchWithRetry(url, opts = {}, retries = 2) {
+async function fetchWithRetry(url, opts = {}, retries = 1) {
   for (let i = 0; i <= retries; i++) {
     try {
       const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), opts.timeout || 9000);
+      const t = setTimeout(() => ctrl.abort(), opts.timeout || 5000);
       const res = await fetch(url, { ...opts, signal: ctrl.signal });
       clearTimeout(t);
       if (res.ok) return res;
-      if (res.status === 429 && i < retries) { await new Promise(r => setTimeout(r, 1500 * (i + 1))); continue; }
+      if (res.status === 429 && i < retries) { await new Promise(r => setTimeout(r, 1000)); continue; }
       return res;
     } catch (e) {
       if (i === retries) return null;
-      await new Promise(r => setTimeout(r, 800 * (i + 1)));
+      await new Promise(r => setTimeout(r, 500));
     }
   }
   return null;
@@ -48,7 +48,7 @@ async function fetchWithRetry(url, opts = {}, retries = 2) {
 async function checkViaSkiddle(domain) {
   try {
     const res = await fetchWithRetry(`https://check.skiddle.id/?domain=${encodeURIComponent(domain)}&json=true`, {
-      cf: { cacheTtl: 300, cacheEverything: true }, timeout: 8000
+      cf: { cacheTtl: 300, cacheEverything: true }, timeout: 5000
     });
     if (!res || !res.ok) return null;
     const data = await res.json();
@@ -64,7 +64,7 @@ async function checkViaSkiddleBulk(domains) {
   const out = {};
   try {
     const url = `https://check.skiddle.id/?domains=${domains.map(encodeURIComponent).join(',')}&json=true`;
-    const res = await fetchWithRetry(url, { cf: { cacheTtl: 300, cacheEverything: true }, timeout: 15000 });
+    const res = await fetchWithRetry(url, { cf: { cacheTtl: 300, cacheEverything: true }, timeout: 12000 });
     if (!res || !res.ok) return out;
     const data = await res.json();
     for (const d of domains) {
@@ -75,38 +75,34 @@ async function checkViaSkiddleBulk(domains) {
   return out;
 }
 
-// Source 2: Trust Positif scrape — coba 2 path URL sekaligus
+// Source 2: Trust Positif scrape — single URL only, no retry, fail-fast
 async function checkViaTrustPositif(domain) {
   const headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     'Accept': 'text/html,application/xhtml+xml',
     'Accept-Language': 'id-ID,id;q=0.9,en;q=0.8'
   };
-  const urls = [
-    `https://trustpositif.komdigi.go.id/?trpdomain=${encodeURIComponent(domain)}`,
-    `https://trustpositif.komdigi.go.id/Public/Search?term=${encodeURIComponent(domain)}`
-  ];
-  for (const url of urls) {
-    try {
-      const res = await fetchWithRetry(url, { headers, redirect: 'follow', cf: { cacheTtl: 300, cacheEverything: true }, timeout: 10000 });
-      if (!res || !res.ok) continue;
-      const html = await res.text();
-      const lower = html.toLowerCase();
-      const domainLow = domain.toLowerCase();
-      // Exact-match heuristic: pencarian kasus "blocked"
-      for (const kw of BLOCK_KEYWORDS) {
-        if (lower.includes(kw)) {
-          // Konfirmasi domain juga muncul di halaman, atau block kata muncul cukup awal
-          if (lower.includes(domainLow) || lower.indexOf(kw) < 8000) {
-            return { status: 'blocked', source: 'tp', matched: kw };
-          }
+  const url = `https://trustpositif.komdigi.go.id/?trpdomain=${encodeURIComponent(domain)}`;
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 6000);
+    const res = await fetch(url, { headers, redirect: 'follow', signal: ctrl.signal, cf: { cacheTtl: 300, cacheEverything: true } });
+    clearTimeout(t);
+    if (!res.ok) return null;
+    const html = await res.text();
+    const lower = html.toLowerCase();
+    const domainLow = domain.toLowerCase();
+    for (const kw of BLOCK_KEYWORDS) {
+      if (lower.includes(kw)) {
+        if (lower.includes(domainLow) || lower.indexOf(kw) < 8000) {
+          return { status: 'blocked', source: 'tp', matched: kw };
         }
       }
-      for (const kw of SAFE_KEYWORDS) {
-        if (lower.includes(kw)) return { status: 'safe', source: 'tp', matched: kw };
-      }
-    } catch {}
-  }
+    }
+    for (const kw of SAFE_KEYWORDS) {
+      if (lower.includes(kw)) return { status: 'safe', source: 'tp', matched: kw };
+    }
+  } catch {}
   return null;
 }
 
@@ -131,24 +127,25 @@ async function checkViaDNSResolve(domain) {
   return null;
 }
 
-// Multi-source check dengan agreement logic
+// Multi-source check dengan agreement logic + hard global timeout
 async function checkNawala(domain) {
-  // Run sumber paralel untuk speed
-  const [skid, tp] = await Promise.all([
-    checkViaSkiddle(domain),
-    checkViaTrustPositif(domain)
-  ]);
-
-  // Agreement: 2 source confirm = high confidence
-  if (skid && tp && skid.status === tp.status) {
-    return { status: skid.status, source: 'skiddle+tp', confidence: 'high' };
-  }
-  // Skiddle alone (most reliable)
-  if (skid) return { ...skid, confidence: 'medium' };
-  // TP alone
-  if (tp) return { ...tp, confidence: 'medium' };
-  // Last resort
-  return { status: 'unknown', error: 'all methods failed', confidence: 'none' };
+  const overallTimeout = new Promise(resolve => setTimeout(() => resolve('TIMEOUT'), 9000));
+  const work = (async () => {
+    // Run sumber paralel untuk speed
+    const [skid, tp] = await Promise.all([
+      checkViaSkiddle(domain).catch(() => null),
+      checkViaTrustPositif(domain).catch(() => null)
+    ]);
+    if (skid && tp && skid.status === tp.status) {
+      return { status: skid.status, source: 'skiddle+tp', confidence: 'high' };
+    }
+    if (skid) return { ...skid, confidence: 'medium' };
+    if (tp) return { ...tp, confidence: 'medium' };
+    return { status: 'unknown', error: 'all methods failed', confidence: 'none' };
+  })();
+  const r = await Promise.race([work, overallTimeout]);
+  if (r === 'TIMEOUT') return { status: 'unknown', error: 'global timeout 9s', confidence: 'none' };
+  return r;
 }
 
 export default {
