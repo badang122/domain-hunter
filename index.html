@@ -1414,6 +1414,10 @@
         <button onclick="nwRecheckAll()">🔄 Recheck Semua</button>
         <button class="btn-warn" onclick="nwBulkOpenTabs()" title="Buka semua domain di Trust Positif (max 20)">🪟 Buka 20 Tab</button>
         <button onclick="nwStartRealVerify()" style="background:linear-gradient(135deg,#dc2626,#7f1d1d);color:white;font-weight:700;padding:8px 14px;border:0;border-radius:8px;cursor:pointer;" title="Cek di trustpositif.komdigi.go.id langsung via iframe + tandai per domain">🇮🇩 Real Verify (Trust Positif Asli)</button>
+        <button onclick="nwBulkMarkUnchecked('safe')" style="background:#10b981;color:white;font-weight:700;padding:8px 14px;border:0;border-radius:8px;cursor:pointer;" title="Tandai semua domain Belum sebagai Aman (asumsi safe — adjust manual untuk yg blokir)">✅ Mark All Belum → Aman</button>
+      </div>
+      <div id="nwSkiddleStatusBanner" style="margin-top:8px;padding:8px 12px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.4);border-radius:8px;font-size:12px;color:#fbbf24;">
+        ⚠️ <b>Skiddle.id sedang down</b> (CF error 1016 — DNS issue di sisi service). Auto-check kemungkinan gagal. Workaround: pakai <b>🇮🇩 Real Verify</b> per domain, atau <b>✅ Mark All → Aman</b> lalu adjust manual yg blokir via filter.
       </div>
       <div style="margin-top:10px;padding:10px;background:linear-gradient(90deg,rgba(239,68,68,0.15),rgba(245,158,11,0.1));border:1px solid rgba(239,68,68,0.4);border-radius:8px;">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
@@ -3503,6 +3507,37 @@ function nwOpenTrustPositif() {
   const d = document.getElementById('nwSingleDomain').value.trim().toLowerCase();
   if (!d) return alert('Masukkan domain dulu');
   window.open(`https://trustpositif.komdigi.go.id/?trpdomain=${encodeURIComponent(d)}`, '_blank');
+}
+
+// Bulk mark semua domain "Belum" sebagai status tertentu (safe/blocked)
+function nwBulkMarkUnchecked(targetStatus) {
+  const data = (typeof allData !== 'undefined' && allData.length) ? allData : getAllDomainsForAI();
+  const meta = JSON.parse(localStorage.getItem('dashboard_meta') || '{}');
+  const targets = data.filter(d => {
+    const nw = (meta[d.domain] || {}).nawala || d.nawala;
+    return !nw || nw === '' || nw === 'unchecked';
+  }).map(d => d.domain);
+
+  if (targets.length === 0) { toast('Semua domain sudah dicek', 'success'); return; }
+  const label = targetStatus === 'safe' ? '🟢 Aman' : '🔴 Blokir';
+  const warn = `⚠️ Tandai ${targets.length} domain Belum sebagai ${label}?\n\n` +
+               `Asumsi default: kebanyakan domain hunting result memang aman. Yang ternyata blokir bisa di-mark manual nanti pakai filter ${label==='🟢 Aman'?'Blokir':'Aman'}.\n\n` +
+               `Lanjut?`;
+  if (!confirm(warn)) return;
+
+  const now = new Date().toISOString();
+  for (const dom of targets) {
+    saveMeta(dom, { nawala: targetStatus, nawalaCheckedAt: now, nawalaSource: 'bulk-default' });
+    nwHistory[dom] = { status: targetStatus, when: now };
+    const d = allData.find(x => x.domain === dom);
+    if (d) d.nawala = targetStatus;
+  }
+  localStorage.setItem('dashboard_nawala_history', JSON.stringify(nwHistory));
+  updateNawalaStats();
+  renderNawalaTable();
+  if (typeof applyFilters === 'function') applyFilters();
+  toast(`✅ ${targets.length} domain ditandai ${label}`, 'success', 3500);
+  if (typeof logActivity === 'function') logActivity('NAWALA_BULK_DEFAULT', `${targets.length} → ${targetStatus}`);
 }
 
 // Hapus single domain dari tabel Nawala — soft delete (bisa di-restore di Settings)
