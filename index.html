@@ -3268,47 +3268,54 @@ async function autoGenerateAllNawala() {
   const failedDomains = [];
   const started = Date.now();
 
-  // PASS 1 — Server-side bulk endpoint (CF Pages Function)
-  // Worker melakukan: Skiddle bulk → fallback Skiddle single → fallback TP scrape
+  // PASS 1 — Skiddle bulk DIRECT dari browser (IP user di Indonesia bisa reach Skiddle)
+  // Server-side endpoint /api/check-nawala saat ini Skiddle return CF 1016 DNS error,
+  // jadi client-side dipakai sebagai PRIMARY.
   for (let i = 0; i < unchecked.length; i += BATCH_SIZE) {
     const batch = unchecked.slice(i, i + BATCH_SIZE);
     let batchResults = {};
+
+    // Try Skiddle bulk client-side (paling reliable dari Indonesia)
     try {
-      const res = await fetch('/api/check-nawala-bulk', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ domains: batch })
-      });
-      if (res.ok) {
-        const j = await res.json();
-        for (const r of (j.results || [])) {
-          if (r.status === 'blocked' || r.status === 'safe') {
-            batchResults[r.domain] = r.status;
-          }
+      const skiddleResults = await checkNawalaViaSkiddleBulk(batch);
+      for (const d of batch) {
+        if (skiddleResults[d] === 'blocked' || skiddleResults[d] === 'safe') {
+          batchResults[d] = skiddleResults[d];
         }
       }
-    } catch (e) { console.warn('[nawala] server bulk failed:', e); }
+    } catch (e) { console.warn('[nawala] client Skiddle bulk failed:', e); }
 
-    // PASS 2 — Untuk yg masih gagal di server endpoint, fallback Skiddle direct client
+    // PASS 2 — Untuk yg gagal, per-domain Skiddle direct (kadang bulk truncate)
     const stillFailing = batch.filter(d => !batchResults[d]);
     if (stillFailing.length > 0) {
-      const skiddleResults = await checkNawalaViaSkiddleBulk(stillFailing);
-      for (const d of stillFailing) {
-        if (skiddleResults[d]) batchResults[d] = skiddleResults[d];
-      }
-    }
-
-    // PASS 3 — Sisanya, per-domain `checkNawala` (multi-method include DNS resolve)
-    const finalFailing = batch.filter(d => !batchResults[d]);
-    if (finalFailing.length > 0) {
-      const perDomainPromises = finalFailing.map(async d => {
-        try { return [d, await checkNawala(d)]; }
+      const perDomainPromises = stillFailing.map(async d => {
+        try { return [d, await checkNawalaViaSkiddle(d)]; }
         catch { return [d, null]; }
       });
       const perResults = await Promise.all(perDomainPromises);
       for (const [d, r] of perResults) {
         if (r === 'blocked' || r === 'safe') batchResults[d] = r;
       }
+    }
+
+    // PASS 3 — Last resort: server-side endpoint (mungkin work kalau Skiddle udah sembuh)
+    const finalFailing = batch.filter(d => !batchResults[d]);
+    if (finalFailing.length > 0) {
+      try {
+        const res = await fetch('/api/check-nawala-bulk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ domains: finalFailing })
+        });
+        if (res.ok) {
+          const j = await res.json();
+          for (const r of (j.results || [])) {
+            if (r.status === 'blocked' || r.status === 'safe') {
+              batchResults[r.domain] = r.status;
+            }
+          }
+        }
+      } catch (e) { console.warn('[nawala] server endpoint failed:', e); }
     }
 
     // Save & update
