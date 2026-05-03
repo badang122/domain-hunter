@@ -111,9 +111,30 @@
   body.light [style*="var(--muted)"], body.light .hint { color: #475569 !important; }
   /* Hint tip at bottom */
   body.light p.hint, body.light .add-form-row + p { color: #475569 !important; }
-  /* Tabel header + cells */
+  /* Tabel header + cells — light mode override (kalahkan solid dark hex dari dark mode) */
   body.light th { background: #e2e8f0 !important; color: #1e1b4b !important; }
-  body.light tr:hover td { background: #f1f5f9 !important; }
+  body.light tbody td { background: #ffffff !important; color: #1e293b !important; }
+  body.light tbody tr:nth-child(even) td { background: #f8fafc !important; }
+  body.light tbody tr:hover td { background: #eef2ff !important; }
+  body.light tbody td * { color: #1e293b; }
+  /* Tag (status) di light mode — text gelap, background pucat */
+  body.light .tag { color: #1e293b !important; }
+  body.light .tag-aman    { background: #d1fae5 !important; color: #065f46 !important; border-color: #10b981 !important; }
+  body.light .tag-warning { background: #fef3c7 !important; color: #92400e !important; border-color: #f59e0b !important; }
+  body.light .tag-urgent  { background: #fee2e2 !important; color: #991b1b !important; border-color: #ef4444 !important; }
+  body.light .tag-expired { background: #fce7f3 !important; color: #9f1239 !important; border-color: #e11d48 !important; }
+  body.light .tag-new     { background: #e0e7ff !important; color: #3730a3 !important; border-color: #6366f1 !important; }
+  body.light .tag-buying  { background: #ede9fe !important; color: #5b21b6 !important; border-color: #8b5cf6 !important; }
+  body.light .tag-owned   { background: #d1fae5 !important; color: #065f46 !important; border-color: #10b981 !important; }
+  body.light .tag-reject  { background: #fee2e2 !important; color: #991b1b !important; border-color: #ef4444 !important; }
+  body.light .tag-interest{ background: #fef3c7 !important; color: #92400e !important; border-color: #f59e0b !important; }
+  /* Score badges di light mode */
+  body.light .score.s-high { background: #d1fae5 !important; color: #065f46 !important; border-color: #10b981 !important; }
+  body.light .score.s-mid  { background: #fef3c7 !important; color: #92400e !important; border-color: #f59e0b !important; }
+  body.light .score.s-low  { background: #fee2e2 !important; color: #991b1b !important; border-color: #ef4444 !important; }
+  /* Domain link warna lebih gelap */
+  body.light .domain { color: #3730a3 !important; }
+  body.light .domain:hover { color: #1e1b4b !important; }
   /* Filter bar input */
   body.light .filter-group label { color: #475569 !important; }
   /* Tag chip in light mode */
