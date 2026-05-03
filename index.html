@@ -369,11 +369,12 @@
   th:hover { color: var(--text); background: var(--panel-hover); }
   th.sorted-asc::after { content: " ↑"; color: var(--accent); }
   th.sorted-desc::after { content: " ↓"; color: var(--accent); }
-  td { padding: 12px 10px; border-bottom: 1px solid rgba(148,163,184,0.12); border-right: 1px solid rgba(148,163,184,0.10); font-size: 13px; }
+  td { padding: 12px 10px; border-bottom: 1px solid rgba(148,163,184,0.18); border-right: 1px solid rgba(148,163,184,0.14); font-size: 13px; background: #1a1f2e; }
   td:last-child { border-right: none; }
   td[contenteditable]:focus { outline: 2px solid var(--accent); background: var(--bg-soft); border-radius: 4px; }
-  tbody tr:nth-child(even) td { background: rgba(255,255,255,0.018); }
-  tbody tr:hover td { background: rgba(99,102,241,0.06) !important; }
+  /* Solid zebra striping — RDP-friendly (gak pakai opacity yg ke-compress) */
+  tbody tr:nth-child(even) td { background: #1f2435; }
+  tbody tr:hover td { background: #2a2f44 !important; }
   tr:last-child td { border-bottom: none; }
   .domain { font-weight: 500; color: #a5b4fc; }
   .domain:hover { color: var(--accent); text-decoration: underline; cursor: pointer; }
