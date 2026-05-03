@@ -6655,14 +6655,17 @@ function pomoSavePersist() {
 }
 
 function pomoUpdateDisplay() {
+  // Pomodoro UI sudah dihapus — guard semua DOM access supaya tidak crash
+  const disp = document.getElementById('pomoDisplay');
+  if (!disp) return; // Pomodoro UI tidak ada → skip
   const m = Math.floor(pomoState.remaining / 60);
   const s = pomoState.remaining % 60;
   const txt = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-  const disp = document.getElementById('pomoDisplay');
   const status = document.getElementById('pomoStatus');
   const collapsedTime = document.getElementById('pomoTime');
   const icon = document.getElementById('pomoIcon');
-  if (disp) disp.textContent = txt;
+  disp.textContent = txt;
+  disp.style.color = pomoState.isBreak ? '#34d399' : '#f87171';
   if (collapsedTime) {
     collapsedTime.textContent = txt;
     collapsedTime.style.display = pomoState.running ? '' : 'none';
@@ -6671,10 +6674,12 @@ function pomoUpdateDisplay() {
     ? (pomoState.isBreak ? '☕ Break time' : '🎯 Focus mode')
     : 'Ready to focus';
   if (icon) icon.textContent = pomoState.isBreak ? '☕' : '🍅';
-  if (disp) disp.style.color = pomoState.isBreak ? '#34d399' : '#f87171';
-  document.getElementById('pomoCount').textContent = pomoState.doneToday;
-  document.getElementById('pomoStartBtn').style.display = pomoState.running ? 'none' : '';
-  document.getElementById('pomoPauseBtn').style.display = pomoState.running ? '' : 'none';
+  const cnt = document.getElementById('pomoCount');
+  if (cnt) cnt.textContent = pomoState.doneToday;
+  const startBtn = document.getElementById('pomoStartBtn');
+  if (startBtn) startBtn.style.display = pomoState.running ? 'none' : '';
+  const pauseBtn = document.getElementById('pomoPauseBtn');
+  if (pauseBtn) pauseBtn.style.display = pomoState.running ? '' : 'none';
 }
 
 function pomoStart() {
