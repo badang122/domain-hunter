@@ -1455,6 +1455,7 @@
       <button onclick="nwFilter('unchecked')" id="nwFilterUnchecked">❓ Belum</button>
       <input id="nwSearchResult" placeholder="🔎 Cari domain..." style="flex:1;min-width:150px;" oninput="renderNawalaTable()">
       <button class="btn-success" onclick="nwExportCSV()">📥 Export CSV</button>
+      <button class="btn-danger" onclick="nwBulkDeleteFiltered()" title="Hapus semua domain yg sedang tampil di filter aktif">🗑 Hapus Filtered</button>
     </div>
 
     <!-- Results Table -->
@@ -3459,6 +3460,7 @@ function renderNawalaTable() {
           <a class="check-link nw" href="https://trustpositif.komdigi.go.id/?trpdomain=${encodeURIComponent(d.domain)}" target="_blank" title="Buka Trust Positif di tab baru">🔗</a>
           <button class="check-link" style="background:#10b981;color:white;padding:3px 8px;" onclick="nwMark('${d.domain}','safe')" title="Tandai AMAN">🟢</button>
           <button class="check-link" style="background:#ef4444;color:white;padding:3px 8px;" onclick="nwMark('${d.domain}','blocked')" title="Tandai BLOKIR">🔴</button>
+          <button class="check-link" style="background:#64748b;color:white;padding:3px 8px;" onclick="nwDeleteDomain('${d.domain}')" title="🗑 Hapus domain (soft — bisa di-restore)">🗑</button>
       </td>
     </tr>`;
   }).join('');
@@ -3494,6 +3496,72 @@ function nwOpenTrustPositif() {
   const d = document.getElementById('nwSingleDomain').value.trim().toLowerCase();
   if (!d) return alert('Masukkan domain dulu');
   window.open(`https://trustpositif.komdigi.go.id/?trpdomain=${encodeURIComponent(d)}`, '_blank');
+}
+
+// Hapus single domain dari tabel Nawala — soft delete (bisa di-restore di Settings)
+function nwDeleteDomain(domain) {
+  if (!confirm(`🗑 Hapus "${domain}"?\n\nDomain pindah ke trash list — bisa di-restore via Settings → Blocklist.\n(Status Nawala juga ikut hilang dari history)`)) return;
+  // Soft delete: hapus dari custom_domains, tambah ke deleted_domains
+  const custom = JSON.parse(localStorage.getItem('dashboard_custom_domains') || '[]');
+  localStorage.setItem('dashboard_custom_domains', JSON.stringify(custom.filter(d => d.domain !== domain)));
+  const deleted = JSON.parse(localStorage.getItem('dashboard_deleted_domains') || '[]');
+  if (!deleted.includes(domain)) {
+    deleted.push(domain);
+    localStorage.setItem('dashboard_deleted_domains', JSON.stringify(deleted));
+  }
+  // Hapus history Nawala juga
+  delete nwHistory[domain];
+  localStorage.setItem('dashboard_nawala_history', JSON.stringify(nwHistory));
+  // Update in-memory data
+  if (typeof allData !== 'undefined') allData = allData.filter(d => d.domain !== domain);
+  // Re-render
+  if (typeof updateNawalaStats === 'function') updateNawalaStats();
+  renderNawalaTable();
+  if (typeof applyFilters === 'function') applyFilters();
+  toast(`🗑 ${domain} dihapus (bisa di-restore)`, 'success', 2500);
+  if (typeof logActivity === 'function') logActivity('NAWALA_DELETE', domain);
+}
+
+// Bulk hapus berdasarkan filter aktif (Aman / Blokir / Belum / Semua yg lagi tampil)
+function nwBulkDeleteFiltered() {
+  const data = (typeof allData !== 'undefined' && allData.length) ? allData : getAllDomainsForAI();
+  const meta = JSON.parse(localStorage.getItem('dashboard_meta') || '{}');
+  const q = document.getElementById('nwSearchResult')?.value.toLowerCase() || '';
+
+  const targets = data.filter(d => {
+    const m = meta[d.domain] || {};
+    const nw = m.nawala || d.nawala || 'unchecked';
+    if (nwCurrentFilter === 'safe' && nw !== 'safe') return false;
+    if (nwCurrentFilter === 'blocked' && nw !== 'blocked') return false;
+    if (nwCurrentFilter === 'unchecked' && (nw === 'safe' || nw === 'blocked')) return false;
+    if (q && !d.domain.toLowerCase().includes(q)) return false;
+    return true;
+  }).map(d => d.domain);
+
+  if (targets.length === 0) { toast('Tidak ada domain di filter aktif', 'warn'); return; }
+  const filterLabel = nwCurrentFilter === 'safe' ? '🟢 Aman' :
+                      nwCurrentFilter === 'blocked' ? '🔴 Blokir' :
+                      nwCurrentFilter === 'unchecked' ? '❓ Belum' : 'Semua';
+  if (!confirm(`🗑 Hapus ${targets.length} domain dari filter "${filterLabel}"?\n\nSoft delete — bisa di-restore via Settings → Blocklist.`)) return;
+
+  const custom = JSON.parse(localStorage.getItem('dashboard_custom_domains') || '[]');
+  const deleted = JSON.parse(localStorage.getItem('dashboard_deleted_domains') || '[]');
+  const deletedSet = new Set(deleted);
+  for (const dom of targets) {
+    deletedSet.add(dom);
+    delete nwHistory[dom];
+  }
+  const newCustom = custom.filter(d => !targets.includes(d.domain));
+  localStorage.setItem('dashboard_custom_domains', JSON.stringify(newCustom));
+  localStorage.setItem('dashboard_deleted_domains', JSON.stringify([...deletedSet]));
+  localStorage.setItem('dashboard_nawala_history', JSON.stringify(nwHistory));
+  if (typeof allData !== 'undefined') allData = allData.filter(d => !targets.includes(d.domain));
+
+  updateNawalaStats();
+  renderNawalaTable();
+  if (typeof applyFilters === 'function') applyFilters();
+  toast(`🗑 ${targets.length} domain dihapus`, 'success', 3500);
+  if (typeof logActivity === 'function') logActivity('NAWALA_BULK_DELETE', `${targets.length} domain`);
 }
 
 // ════════════════════════════════════════════════════════════════
