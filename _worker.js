@@ -44,13 +44,17 @@ async function fetchWithRetry(url, opts = {}, retries = 1) {
   return null;
 }
 
-// Source 1: Skiddle API (single)
+// Source 1: Skiddle API (single) — direct fetch, no wrapper (proven works)
 async function checkViaSkiddle(domain) {
   try {
-    const res = await fetchWithRetry(`https://check.skiddle.id/?domain=${encodeURIComponent(domain)}&json=true`, {
-      cf: { cacheTtl: 300, cacheEverything: true }, timeout: 5000
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 6000);
+    const res = await fetch(`https://check.skiddle.id/?domain=${encodeURIComponent(domain)}&json=true`, {
+      signal: ctrl.signal,
+      cf: { cacheTtl: 300, cacheEverything: true }
     });
-    if (!res || !res.ok) return null;
+    clearTimeout(t);
+    if (!res.ok) return null;
     const data = await res.json();
     const r = data[domain] || data[domain.toLowerCase()];
     if (!r || typeof r.blocked !== 'boolean') return null;
@@ -58,14 +62,17 @@ async function checkViaSkiddle(domain) {
   } catch { return null; }
 }
 
-// Source 1b: Skiddle bulk (lebih efisien)
+// Source 1b: Skiddle bulk — direct fetch
 async function checkViaSkiddleBulk(domains) {
   if (!domains.length) return {};
   const out = {};
   try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 12000);
     const url = `https://check.skiddle.id/?domains=${domains.map(encodeURIComponent).join(',')}&json=true`;
-    const res = await fetchWithRetry(url, { cf: { cacheTtl: 300, cacheEverything: true }, timeout: 12000 });
-    if (!res || !res.ok) return out;
+    const res = await fetch(url, { signal: ctrl.signal, cf: { cacheTtl: 300, cacheEverything: true } });
+    clearTimeout(t);
+    if (!res.ok) return out;
     const data = await res.json();
     for (const d of domains) {
       const r = data[d] || data[d.toLowerCase()];
@@ -154,6 +161,36 @@ export default {
 
     if (url.pathname === '/api/ping') {
       return jsonResp({ ok: true, ts: Date.now() });
+    }
+
+    // Debug endpoint — test Skiddle dari worker dengan detail error
+    if (url.pathname === '/api/debug-nawala') {
+      const domain = (url.searchParams.get('domain') || 'pornhub.com').trim();
+      const debug = { domain, tests: {} };
+      // Test 1: Skiddle direct
+      try {
+        const t0 = Date.now();
+        const res = await fetch(`https://check.skiddle.id/?domain=${encodeURIComponent(domain)}&json=true`);
+        const elapsed = Date.now() - t0;
+        debug.tests.skiddle = {
+          status: res.status, ok: res.ok, elapsed_ms: elapsed,
+          body: (await res.text()).slice(0, 500)
+        };
+      } catch (e) { debug.tests.skiddle = { error: String(e) }; }
+      // Test 2: TP direct
+      try {
+        const t0 = Date.now();
+        const res = await fetch(`https://trustpositif.komdigi.go.id/?trpdomain=${encodeURIComponent(domain)}`, {
+          headers: { 'User-Agent': 'Mozilla/5.0 Chrome/120', 'Accept': 'text/html' },
+          redirect: 'follow'
+        });
+        const elapsed = Date.now() - t0;
+        debug.tests.tp = {
+          status: res.status, ok: res.ok, elapsed_ms: elapsed,
+          body_preview: (await res.text()).slice(0, 300)
+        };
+      } catch (e) { debug.tests.tp = { error: String(e) }; }
+      return jsonResp(debug);
     }
 
     if (url.pathname === '/api/check-nawala') {
