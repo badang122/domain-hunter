@@ -229,6 +229,61 @@ export default {
       }
     }
 
+    // ════════════════════════════════════════════════════════════════
+    // /api/check-availability — Namecheap authoritative check
+    // GET ?domain=X → return {status: 'available'|'registered'|'unknown', source}
+    // POST body: {domains: [...]} → bulk (max 30)
+    // Scrape Namecheap search result page, lebih akurat dari RDAP
+    // ════════════════════════════════════════════════════════════════
+    async function checkViaNamecheap(domain) {
+      try {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 7000);
+        const res = await fetch(`https://www.namecheap.com/domains/registration/results/?domain=${encodeURIComponent(domain)}`, {
+          signal: ctrl.signal,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml',
+            'Accept-Language': 'en-US,en;q=0.9'
+          },
+          redirect: 'follow',
+          cf: { cacheTtl: 600, cacheEverything: true }
+        });
+        clearTimeout(t);
+        if (!res.ok) return null;
+        const html = (await res.text()).toLowerCase();
+        // Indicator REGISTERED: "registered in YYYY", "make offer", "marketplace", "domain is taken"
+        const regIndicators = ['registered in 19', 'registered in 20', 'make offer', 'marketplace</', 'domain is taken', 'this domain is taken', 'is unavailable'];
+        for (const ind of regIndicators) {
+          if (html.includes(ind)) return { status: 'registered', source: 'namecheap', matched: ind };
+        }
+        // Indicator AVAILABLE: "add to cart", "buy now" pada hasil utama (bukan suggested)
+        // Cara cek: nama domain muncul dengan "add to cart" dekat di HTML
+        const domainEsc = domain.toLowerCase().replace(/\./g, '\\.');
+        const rx = new RegExp(`${domainEsc}[\\s\\S]{0,1500}(?:add to cart|buy it now)`, 'i');
+        if (rx.test(html)) return { status: 'available', source: 'namecheap', matched: 'add-to-cart' };
+        return null;
+      } catch { return null; }
+    }
+
+    if (url.pathname === '/api/check-availability') {
+      const domain = (url.searchParams.get('domain') || '').trim().toLowerCase();
+      if (!domain) return jsonResp({ error: 'missing domain' }, 400);
+      const r = await checkViaNamecheap(domain);
+      return jsonResp({ domain, ...(r || { status: 'unknown', error: 'parse failed' }) });
+    }
+    if (url.pathname === '/api/check-availability-bulk' && request.method === 'POST') {
+      try {
+        const body = await request.json();
+        const domains = (body.domains || []).slice(0, 30);
+        const results = await Promise.all(domains.map(async d => {
+          const r = await checkViaNamecheap(d);
+          return { domain: d, ...(r || { status: 'unknown' }) };
+        }));
+        return jsonResp({ results });
+      } catch (e) { return jsonResp({ error: String(e) }, 400); }
+    }
+
     if (url.pathname === '/api/check-nawala-bulk' && request.method === 'POST') {
       try {
         const body = await request.json();

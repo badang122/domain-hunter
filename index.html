@@ -8572,6 +8572,47 @@ async function runAvailCheck() {
     }
   }
   await Promise.all(Array.from({length: CONCURRENCY}, worker));
+
+  // FINAL VERIFY — domain yang masuk "available" diverify ulang via Namecheap scrape
+  // (CF Worker fetch ke namecheap.com, parse "REGISTERED IN" / "Make offer" / "Add to cart")
+  // Ini lebih akurat dari RDAP karena Namecheap punya database lengkap termasuk parked & redemption
+  const availableDomains = results.filter(r => r.status === 'available').map(r => r.domain);
+  if (availableDomains.length > 0 && availableDomains.length <= 200) {
+    document.getElementById('availRunBtn').textContent = `🔍 Verify ${availableDomains.length} via Namecheap...`;
+    const VERIFY_BATCH = 30;
+    let verified = 0;
+    for (let i = 0; i < availableDomains.length; i += VERIFY_BATCH) {
+      const batch = availableDomains.slice(i, i + VERIFY_BATCH);
+      try {
+        const res = await fetch('/api/check-availability-bulk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ domains: batch })
+        });
+        if (res.ok) {
+          const j = await res.json();
+          for (const ncRes of (j.results || [])) {
+            // Override hanya kalau Namecheap KETAHUAN registered (yang paling penting)
+            // Kalau Namecheap juga bilang available, biarkan (sudah cocok)
+            // Kalau Namecheap unknown, biarkan (RDAP udah bilang available)
+            if (ncRes.status === 'registered') {
+              const idx = results.findIndex(x => x.domain === ncRes.domain);
+              if (idx >= 0) {
+                results[idx].status = 'registered';
+                results[idx].verifiedSource = 'namecheap';
+                available--;
+                registered++;
+              }
+            }
+            verified++;
+          }
+        }
+      } catch (e) { console.warn('[verify] batch failed:', e); }
+      const pct = Math.round((verified / availableDomains.length) * 100);
+      document.getElementById('availProgressText').textContent = `🔍 Namecheap verify: ${verified}/${availableDomains.length} (${pct}%) — 🟢 ${available} | 🔴 ${registered}`;
+    }
+  }
+
   document.title = 'Domain Hunter Dashboard';
   document.getElementById('availRunBtn').disabled = false;
   document.getElementById('availRunBtn').textContent = '🔍 Check Lagi';
