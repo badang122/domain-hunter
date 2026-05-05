@@ -83,53 +83,60 @@ async function checkViaMirror(domain) {
 
   let lo = 0, hi = size - 1;
   // 25 iterations = handles up to 33M lines (way more than needed)
-  for (let iter = 0; iter < 25 && hi - lo > 512; iter++) {
+  for (let iter = 0; iter < 25 && hi - lo > 1024; iter++) {
     const mid = Math.floor((lo + hi) / 2);
-    const start = Math.max(0, mid - 256);
-    const end = Math.min(size - 1, mid + 256);
+    const start = Math.max(0, mid - 512);
+    const end = Math.min(size - 1, mid + 512);
     try {
+      // No cf cache — chunks tergantung file content version, hindari stale
       const r = await fetch(TP_MIRROR_PRIMARY, {
-        headers: { 'Range': `bytes=${start}-${end}` },
-        cf: { cacheTtl: 86400, cacheEverything: true }
+        headers: { 'Range': `bytes=${start}-${end}` }
       });
       if (r.status !== 206 && r.status !== 200) return null;
       const chunk = await r.text();
-      // Skip partial first line, take complete lines
+      // Cari complete lines (skip partial leading & trailing)
       const firstNL = chunk.indexOf('\n');
       const lastNL = chunk.lastIndexOf('\n');
-      if (firstNL < 0 || firstNL === lastNL) {
-        lo = end + 1; continue;
-      }
+      if (firstNL < 0 || firstNL === lastNL) { lo = end + 1; continue; }
       const lines = chunk.substring(firstNL + 1, lastNL).split('\n');
-      // Check direct match
+      // Direct match check
       for (const line of lines) {
         const ln = line.trim().toLowerCase();
         if (ln === target) return { status: 'blocked', source: 'tp-mirror', confidence: 'high' };
       }
-      // Direction decision via lexicographic comparison
-      const midLine = lines[Math.floor(lines.length / 2)].trim().toLowerCase();
-      if (!midLine) { lo = end + 1; continue; }
-      if (target < midLine) hi = start;
-      else lo = end;
+      // Direction: pakai LAST line untuk decision (boundary aware)
+      const lastLine = lines[lines.length - 1].trim().toLowerCase();
+      const firstLine = lines[0].trim().toLowerCase();
+      if (target < firstLine) {
+        hi = start - 1;
+      } else if (target > lastLine) {
+        lo = end + 1;
+      } else {
+        // Target di antara firstLine dan lastLine — narrow range
+        // Tidak ditemukan di chunk ini — try linear scan extended
+        const midLine = lines[Math.floor(lines.length / 2)].trim().toLowerCase();
+        if (target < midLine) hi = start + chunk.indexOf(midLine);
+        else lo = start + chunk.indexOf(midLine);
+      }
     } catch { return null; }
   }
-  // Final check: fetch tight range and search linearly
+  // Final linear scan in narrowed range (max 4KB)
   try {
     const r = await fetch(TP_MIRROR_PRIMARY, {
-      headers: { 'Range': `bytes=${lo}-${Math.min(hi, lo + 2048)}` },
-      cf: { cacheTtl: 86400, cacheEverything: true }
+      headers: { 'Range': `bytes=${Math.max(0, lo - 256)}-${Math.min(size - 1, hi + 256 + 4096)}` }
     });
     if (r.status !== 206 && r.status !== 200) return null;
-    const chunk = await r.text();
-    if (chunk.toLowerCase().includes('\n' + target + '\n') ||
-        chunk.toLowerCase().startsWith(target + '\n')) {
+    const chunk = (await r.text()).toLowerCase();
+    if (chunk.includes('\n' + target + '\n') ||
+        chunk.startsWith(target + '\n') ||
+        chunk.endsWith('\n' + target)) {
       return { status: 'blocked', source: 'tp-mirror', confidence: 'high' };
     }
-    // Cek parent domain juga
+    // Parent domain check
     const parts = target.split('.');
     for (let i = 1; i < parts.length - 1; i++) {
       const parent = parts.slice(i).join('.');
-      if (chunk.toLowerCase().includes('\n' + parent + '\n')) {
+      if (chunk.includes('\n' + parent + '\n')) {
         return { status: 'blocked', source: 'tp-mirror-parent', matched_parent: parent, confidence: 'high' };
       }
     }
