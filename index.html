@@ -3079,31 +3079,44 @@ async function checkNawalaViaSkiddle(domain) {
 async function debugSkiddle() {
   const out = document.getElementById('nwDebugOut');
   out.style.display = 'block';
-  out.textContent = '🐛 Testing Skiddle API...\n\n';
-  const tests = ['google.com', 'pornhub.com', 'reddit.com'];
-  for (const d of tests) {
-    out.textContent += `Testing ${d}...\n`;
-    try {
-      const url = `https://check.skiddle.id/?domain=${encodeURIComponent(d)}&json=true`;
-      const res = await fetch(url, { method: 'GET', mode: 'cors' });
-      out.textContent += `  HTTP: ${res.status} ${res.statusText}\n`;
-      out.textContent += `  Headers: ${JSON.stringify(Object.fromEntries(res.headers.entries()))}\n`;
-      const text = await res.text();
-      out.textContent += `  Body: ${text.slice(0, 300)}\n\n`;
-    } catch (e) {
-      out.textContent += `  ❌ ERROR: ${e.message || e}\n`;
-      out.textContent += `  Type: ${e.name}\n`;
-      out.textContent += `  (Likely CORS, network, or DNS issue)\n\n`;
-    }
-  }
-  // Test backend API too
-  out.textContent += '--- Test backend /api/check-nawala ---\n';
+  out.textContent = '🐛 Diagnostic — testing all Nawala data sources...\n\n';
+
+  // 1. Health endpoint
+  out.textContent += '═══ /api/health (semua upstream) ═══\n';
   try {
-    const res = await fetch('/api/check-nawala?domain=google.com');
-    out.textContent += `Backend HTTP: ${res.status}\n`;
-    out.textContent += `Body: ${(await res.text()).slice(0, 300)}\n`;
-  } catch (e) {
-    out.textContent += `Backend ERROR: ${e.message}\n`;
+    const t0 = Date.now();
+    const res = await fetch('/api/health');
+    const j = await res.json();
+    out.textContent += `Worker version: ${j.version || 'unknown'} · overall ok: ${j.ok}\n\n`;
+    for (const [name, t] of Object.entries(j.tests || {})) {
+      const icon = t.ok ? '✅' : '❌';
+      out.textContent += `${icon} ${name.padEnd(20)} ${t.elapsed_ms || '?'}ms ${t.error || (t.status ? 'http '+t.status : '')}\n`;
+    }
+    out.textContent += `\nTotal /api/health: ${Date.now()-t0}ms\n\n`;
+  } catch (e) { out.textContent += `❌ /api/health error: ${e.message}\n\n`; }
+
+  // 2. Mirror per-domain test
+  out.textContent += '═══ /api/check-nawala-mirror (PRIMARY) ═══\n';
+  for (const d of ['pornhub.com', 'google.com', 'reddit.com']) {
+    try {
+      const t0 = Date.now();
+      const res = await fetch(`/api/check-nawala-mirror?domain=${encodeURIComponent(d)}`);
+      const j = await res.json();
+      const icon = j.status === 'blocked' ? '🔴' : j.status === 'safe' ? '🟢' : '⚠️';
+      out.textContent += `${icon} ${d.padEnd(15)} ${j.status} (${j.source}) · ${Date.now()-t0}ms\n`;
+    } catch (e) { out.textContent += `❌ ${d}: ${e.message}\n`; }
+  }
+  out.textContent += '\n';
+
+  // 3. Skiddle direct
+  out.textContent += '═══ Skiddle.id direct (browser) ═══\n';
+  for (const d of ['pornhub.com', 'google.com']) {
+    try {
+      const t0 = Date.now();
+      const res = await fetch(`https://check.skiddle.id/?domain=${encodeURIComponent(d)}&json=true`);
+      const txt = (await res.text()).slice(0, 200);
+      out.textContent += `HTTP ${res.status} ${d}: ${Date.now()-t0}ms → ${txt}\n`;
+    } catch (e) { out.textContent += `❌ ${d}: ${e.message} (CORS/DNS/down)\n`; }
   }
   out.scrollTop = out.scrollHeight;
 }
