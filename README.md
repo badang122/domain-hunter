@@ -1,45 +1,154 @@
 # Domain Hunter Dashboard
 
-SEO metrics tracker untuk expired/aged domain hunting.
+Dashboard untuk track expired/aged domain hunting — DA, PA, DR, BL, Age, Nawala, Score, Status, Notes.
 
-## Live
+**Production**: https://domain-hunter-2pp.pages.dev/
 
-- **Cloudflare Pages**: https://domain-hunter.pages.dev/ (auto-deployed dari push)
-- **Workers (legacy)**: https://domain-hunter.badangxdirot19.workers.dev/
+## ⚡ Quick Start
 
-## Fitur Utama
+```bash
+git clone https://github.com/badang122/domain-hunter.git
+cd domain-hunter
+# Edit index.html (frontend) atau _worker.js (backend)
+git push origin main  # auto-deploy ke CF Pages ~60s
+```
 
-- 📊 Dashboard DA/PA/DR/UR/BL/Age/Score/Status
-- 🔴 Nawala auto-check via Skiddle API + backend `/api/check-nawala`
-- 🤖 Multi-provider AI (Groq/Gemini/OpenRouter/Claude)
-- 🏠 Property Modal: Deal Tracker, Tags, Pin, Expiry
-- 🏆 Leaderboard Top Domains (multiple metrics)
-- ⚖️ Compare up to 4 domains
-- 📥 Bulk Excel/CSV Import
-- 💱 Currency Toggle (IDR/USD)
-- 🍅 Pomodoro Timer + 📌 Sticky Notes
-- ↩️ Undo/Redo (Ctrl+Z)
-- 🌐 Multi-bahasa (12 bahasa)
-- 📱 Mobile responsive
-- ⌨️ Keyboard shortcuts (tekan `?`)
+Test endpoints (live):
+```bash
+chmod +x test-endpoints.sh
+./test-endpoints.sh
+```
 
-## Tech Stack
+## 🏗️ Architecture
 
-- Vanilla HTML/CSS/JS (no framework)
-- Cloudflare Pages + Worker Functions
-- localStorage untuk persistence
-- Chart.js (CDN)
-- SheetJS (CDN) untuk Excel import
+```
+┌──────────────────────────────────────────────────────────────┐
+│                  Browser (User di Indonesia)                 │
+│  • localStorage primary  • IndexedDB backup                  │
+│  • index.html (~9000 lines vanilla JS)                       │
+└──────────────────────────────┬───────────────────────────────┘
+                               │ /api/*
+                               ▼
+┌──────────────────────────────────────────────────────────────┐
+│         Cloudflare Pages Function (_worker.js)               │
+│  • Server-side proxy: Nawala, Namecheap, Gemini, Gist        │
+│  • Env vars: GIST_TOKEN, GIST_ID, GEMINI_KEY (encrypted)     │
+└──────┬─────────────┬──────────────┬───────────────┬──────────┘
+       │             │              │               │
+       ▼             ▼              ▼               ▼
+   ┌──────┐  ┌─────────────┐  ┌──────────┐  ┌────────────┐
+   │ TP   │  │  Namecheap  │  │  Gemini  │  │ GitHub     │
+   │Mirror│  │ search HTML │  │   API    │  │   Gist     │
+   │GitHub│  │   scrape    │  │  proxy   │  │ cross-sync │
+   └──────┘  └─────────────┘  └──────────┘  └────────────┘
+```
 
-## Files
+**Storage layers** (resilience):
+1. localStorage primary — fast, persists in browser
+2. localStorage backup — auto-mirror
+3. IndexedDB — survives cache clear
+4. GitHub Gist — cross-device sync (auto pull/push)
 
-- `index.html` — dashboard frontend (~5000 lines)
-- `_worker.js` — Cloudflare Worker entry point (backend API)
+## 🎯 API Endpoints (`_worker.js`)
 
-## Deploy
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/api/ping` | GET | Health check ringan |
+| `/api/health` | GET | Comprehensive system status |
+| `/api/check-nawala-mirror?domain=X` | GET | **PRIMARY**: pakai TP mirror GitHub |
+| `/api/check-nawala?domain=X` | GET | Multi-source: mirror + Skiddle + TP scrape |
+| `/api/check-nawala-bulk` | POST | Bulk Nawala (max 50) |
+| `/api/debug-nawala?domain=X` | GET | Diagnostic per source |
+| `/api/check-availability?domain=X` | GET | Namecheap scrape authoritative |
+| `/api/check-availability-bulk` | POST | Bulk Namecheap (max 30) |
+| `/api/gemini` | POST | Gemini AI proxy |
+| `/api/gist` | GET/POST | Sync proxy |
+| `/api/gist/meta` | GET | Gist metadata |
 
-Push ke main branch → auto-deploy ke Cloudflare Pages.
+## 🚀 Deploy Pipeline
+
+1. Edit `index.html` atau `_worker.js`
+2. `git add . && git commit -m "..." && git push origin main`
+3. CF Pages auto-rebuild ~60 detik
+
+**Source mirror pattern**: Code utama di `C:\Users\user12\ahrefs_checker\netlify_index.html`. Sebelum push, copy ke `domain-hunter-repo/index.html`.
+
+## 🔐 Cloudflare Pages Environment Variables
+
+Set di Cloudflare Dashboard → Workers & Pages → `domain-hunter` → Settings → Environment variables:
+
+| Variable | Type | Purpose |
+|---|---|---|
+| `GIST_TOKEN` | secret_text | GitHub PAT scope=gist |
+| `GIST_ID` | plain_text | Target Gist ID |
+| `GEMINI_KEY` | secret_text | Google Gemini API |
+
+## ✨ Fitur Utama
+
+### Domain Tracking
+- Tabel 16+ kolom dengan sort & filter
+- Search super (domain + RD list + GoodBL + Notes + Tags)
+- Sticky header
+
+### Auto-Status by Expiry Date
+5 kategori auto-derived dari `expiryDate`:
+- ✅ aman (>90 hari)
+- ⚠️ warning (31-90 hari)
+- 🚨 urgent (≤30 hari)
+- 💀 expired (sudah lewat)
+- — belum lengkap (no expiry)
+
+Klik pill → filter tabel, counter live update.
+
+### Nawala Check (Trust Positif)
+- 🚀 Auto-Gen 4-pass (mirror → Skiddle bulk → server → retry)
+- 🇮🇩 Real Verify via iframe TP
+- Per-row delete + bulk delete by filter
+- Cross-validation multi-source
+
+**Real solution**: pakai TP mirror dari GitHub repo `alsyundawy/TrustPositif` (updated daily) sebagai primary source — lebih reliable dari Skiddle yang sering down.
+
+### Availability Check
+- Multi-pass: RDAP per-TLD + DNS multi-provider
+- **FINAL VERIFY** via Namecheap scrape (fix .org false positives)
+- Binary status: Available / Registered
+
+### AI Tools (Gemini)
+Summary · Top 5 · Berisiko · Strategi · Smart Buy · Portfolio Valuation · Outreach Email · Trend Score · Screenshot OCR.
+
+### Cross-Device Sync (Gist)
+- Hybrid: server primary, direct GitHub fallback
+- Auto-pull on page load (Gist newer than local)
+- Auto-push 8s debounce
+- beforeunload flush dengan keepalive
+
+## 🧪 Testing
+
+```bash
+./test-endpoints.sh                                # production
+./test-endpoints.sh https://preview.pages.dev      # preview
+```
+
+Test coverage:
+- All `/api/*` endpoints respond 200
+- Mirror returns `blocked` untuk porn domain
+- Mirror returns `safe` untuk google.com
+- Bulk endpoints accept POST + return correct shape
+- Health endpoint reports all upstream status
+
+## 📖 Documentation
+
+- [README.md](README.md) — overview (file ini)
+- [ARCHITECTURE.md](ARCHITECTURE.md) — system design detail
+- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) — common issues & fixes
+
+## 📊 Status
+
+- Domains tracked: 700+
+- Hosting: Cloudflare Pages (free tier)
+- Cost: $0/month
+- Security: Tier 2 (PAT server-side via env vars + char-code fallback)
 
 ---
 
-*Built with Claude Opus 4.7 · Badang 2026*
+*Built dengan Claude Opus 4.7 · Badang 2026*

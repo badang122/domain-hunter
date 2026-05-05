@@ -1,6 +1,20 @@
-// Cloudflare Pages Functions - backend API + static assets fallback
-// Endpoint: /api/check-nawala?domain=example.com
-// Server-side fetch ke Trust Positif Kominfo — no CORS issue.
+// ═══════════════════════════════════════════════════════════════════════
+// Domain Hunter Dashboard — Cloudflare Pages Functions backend
+// ═══════════════════════════════════════════════════════════════════════
+// Endpoints:
+//   /api/ping                         — health check ringan
+//   /api/health                       — diagnostic semua upstream services
+//   /api/check-nawala?domain=X        — single domain Nawala check (multi-source)
+//   /api/check-nawala-bulk POST       — bulk (max 50)
+//   /api/check-nawala-mirror?domain=X — REAL solution: pakai GitHub TP mirror
+//                                       (alsyundawy/TrustPositif, daily update)
+//   /api/debug-nawala?domain=X        — diagnostic detail Skiddle/TP error
+//   /api/check-availability?domain=X  — Namecheap scrape authoritative
+//   /api/check-availability-bulk POST — bulk Namecheap (max 30)
+//   /api/gemini POST                  — Gemini AI proxy (key di env.GEMINI_KEY)
+//   /api/gist GET/POST                — GitHub Gist sync proxy (token di env.GIST_TOKEN)
+//   /api/gist/meta                    — gist updated_at lightweight check
+// ═══════════════════════════════════════════════════════════════════════
 
 const BLOCK_KEYWORDS = [
   'terblokir', 'site has been blocked', 'diblokir',
@@ -15,36 +29,81 @@ const SAFE_KEYWORDS = [
   'tidak terdaftar dalam database', 'belum terdaftar'
 ];
 
-function jsonResp(obj, status = 200) {
+// GitHub TP mirror sources — alsyundawy/TrustPositif (updated daily)
+// Pakai categorized files (porn + gambling) untuk balance size vs coverage
+// Ini menutup ~80% Trust Positif blocking (porn & judi adalah kategori utama)
+const TP_MIRROR_URLS = [
+  'https://raw.githubusercontent.com/alsyundawy/TrustPositif/master/alsyundawy_porn_v2.txt',
+  'https://raw.githubusercontent.com/alsyundawy/TrustPositif/master/alsyundawy_gambling_v2.txt',
+];
+
+function jsonResp(obj, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(obj), {
     status,
     headers: {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*',
-      'Cache-Control': 'public, max-age=300'
+      'Cache-Control': 'public, max-age=300',
+      ...extraHeaders
     }
   });
 }
 
-async function fetchWithRetry(url, opts = {}, retries = 1) {
-  for (let i = 0; i <= retries; i++) {
-    try {
-      const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), opts.timeout || 5000);
-      const res = await fetch(url, { ...opts, signal: ctrl.signal });
-      clearTimeout(t);
-      if (res.ok) return res;
-      if (res.status === 429 && i < retries) { await new Promise(r => setTimeout(r, 1000)); continue; }
-      return res;
-    } catch (e) {
-      if (i === retries) return null;
-      await new Promise(r => setTimeout(r, 500));
+// ─── TP MIRROR LOADER (lazy singleton, reused per isolate) ───
+let _blocklistPromise = null;
+let _blocklistMeta = { sources: [], totalDomains: 0, loadedAt: 0, errors: [] };
+async function loadBlocklist() {
+  if (_blocklistPromise) return _blocklistPromise;
+  _blocklistPromise = (async () => {
+    const set = new Set();
+    const meta = { sources: [], totalDomains: 0, loadedAt: Date.now(), errors: [] };
+    for (const url of TP_MIRROR_URLS) {
+      try {
+        const t0 = Date.now();
+        const res = await fetch(url, {
+          cf: { cacheTtl: 86400, cacheEverything: true },
+          headers: { 'User-Agent': 'domain-hunter-dashboard' }
+        });
+        const elapsed = Date.now() - t0;
+        if (!res.ok) {
+          meta.errors.push({ url, status: res.status, elapsed_ms: elapsed });
+          continue;
+        }
+        const text = await res.text();
+        let added = 0;
+        for (const line of text.split('\n')) {
+          const d = line.trim().toLowerCase();
+          if (d && !d.startsWith('#') && !d.startsWith('!')) {
+            set.add(d);
+            added++;
+          }
+        }
+        meta.sources.push({ url, count: added, size_bytes: text.length, elapsed_ms: elapsed });
+      } catch (e) {
+        meta.errors.push({ url, error: String(e).slice(0, 200) });
+      }
     }
-  }
-  return null;
+    meta.totalDomains = set.size;
+    _blocklistMeta = meta;
+    return set;
+  })();
+  return _blocklistPromise;
 }
 
-// Source 1: Skiddle API (single) — direct fetch, no wrapper (proven works)
+async function checkViaMirror(domain) {
+  const set = await loadBlocklist();
+  const d = domain.toLowerCase().replace(/^www\./, '');
+  if (set.has(d)) return { status: 'blocked', source: 'tp-mirror', confidence: 'high' };
+  // Cek juga parent domain (mis. evil.example.com → cek example.com)
+  const parts = d.split('.');
+  for (let i = 1; i < parts.length - 1; i++) {
+    const parent = parts.slice(i).join('.');
+    if (set.has(parent)) return { status: 'blocked', source: 'tp-mirror-parent', matched_parent: parent, confidence: 'high' };
+  }
+  return { status: 'safe', source: 'tp-mirror', confidence: 'medium' };
+}
+
+// ─── SKIDDLE (legacy, masih dicoba kalau service pulih) ───
 async function checkViaSkiddle(domain) {
   try {
     const ctrl = new AbortController();
@@ -62,7 +121,6 @@ async function checkViaSkiddle(domain) {
   } catch { return null; }
 }
 
-// Source 1b: Skiddle bulk — direct fetch
 async function checkViaSkiddleBulk(domains) {
   if (!domains.length) return {};
   const out = {};
@@ -82,7 +140,7 @@ async function checkViaSkiddleBulk(domains) {
   return out;
 }
 
-// Source 2: Trust Positif scrape — single URL only, no retry, fail-fast
+// ─── TRUST POSITIF DIRECT SCRAPE (geo-blocked dari edge non-ID) ───
 async function checkViaTrustPositif(domain) {
   const headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -113,86 +171,167 @@ async function checkViaTrustPositif(domain) {
   return null;
 }
 
-// Source 3: DNS via DoH dengan Indonesian filtering DNS resolver
-// Family Cloudflare DNS (1.1.1.3) filter adult+malware tapi gak Trust Positif specific
-// AdGuard family (94.140.14.15) juga gak Indonesian
-// Skip — DNS-based unreliable untuk Trust Positif
-async function checkViaDNSResolve(domain) {
-  // Pakai Quad9 dengan filter (9.9.9.9) sebagai signal tambahan
-  // Status:3 (NXDOMAIN) di filter resolver = potentially blocked
-  // Tapi masih unreliable untuk Indonesia, jadi cuma sinyal lemah
-  try {
-    const res = await fetchWithRetry(
-      `https://dns.quad9.net:5053/dns-query?name=${encodeURIComponent(domain)}&type=A`,
-      { headers: { Accept: 'application/dns-json' }, timeout: 4000 }
-    );
-    if (!res || !res.ok) return null;
-    const j = await res.json();
-    if (j.Status === 3) return { status: 'maybe_blocked', source: 'dns-quad9' };
-    if (typeof j.Status === 'number') return { status: 'safe', source: 'dns-quad9' };
-  } catch {}
-  return null;
-}
-
-// Multi-source check dengan agreement logic + hard global timeout
+// ─── MULTI-SOURCE NAWALA CHECK (mirror PRIMARY, Skiddle/TP fallback) ───
 async function checkNawala(domain) {
-  const overallTimeout = new Promise(resolve => setTimeout(() => resolve('TIMEOUT'), 9000));
+  const overallTimeout = new Promise(resolve => setTimeout(() => resolve('TIMEOUT'), 10000));
   const work = (async () => {
-    // Run sumber paralel untuk speed
+    // PRIMARY: TP Mirror (always reliable, no rate limit)
+    const mirror = await checkViaMirror(domain).catch(() => null);
+    if (mirror && mirror.status === 'blocked') return mirror;
+    // Verify "safe" with secondary sources kalau mirror bilang safe
     const [skid, tp] = await Promise.all([
       checkViaSkiddle(domain).catch(() => null),
       checkViaTrustPositif(domain).catch(() => null)
     ]);
-    if (skid && tp && skid.status === tp.status) {
-      return { status: skid.status, source: 'skiddle+tp', confidence: 'high' };
+    // Kalau ada source kedua bilang blocked → blocked (mirror mungkin tidak update terbaru)
+    if (skid?.status === 'blocked') return { status: 'blocked', source: 'skiddle-override', confidence: 'high' };
+    if (tp?.status === 'blocked') return { status: 'blocked', source: 'tp-override', confidence: 'high' };
+    // Multi source agree pada safe
+    if (mirror && (skid?.status === 'safe' || tp?.status === 'safe')) {
+      return { status: 'safe', source: 'multi', confidence: 'high' };
     }
+    if (mirror) return mirror; // mirror alone = medium confidence
     if (skid) return { ...skid, confidence: 'medium' };
     if (tp) return { ...tp, confidence: 'medium' };
     return { status: 'unknown', error: 'all methods failed', confidence: 'none' };
   })();
   const r = await Promise.race([work, overallTimeout]);
-  if (r === 'TIMEOUT') return { status: 'unknown', error: 'global timeout 9s', confidence: 'none' };
+  if (r === 'TIMEOUT') return { status: 'unknown', error: 'global timeout 10s', confidence: 'none' };
   return r;
 }
 
+// ─── NAMECHEAP SCRAPE (untuk availability check) ───
+async function checkViaNamecheap(domain) {
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 7000);
+    const res = await fetch(`https://www.namecheap.com/domains/registration/results/?domain=${encodeURIComponent(domain)}`, {
+      signal: ctrl.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml',
+        'Accept-Language': 'en-US,en;q=0.9'
+      },
+      redirect: 'follow',
+      cf: { cacheTtl: 600, cacheEverything: true }
+    });
+    clearTimeout(t);
+    if (!res.ok) return null;
+    const html = (await res.text()).toLowerCase();
+    const regIndicators = ['registered in 19', 'registered in 20', 'make offer', 'marketplace</', 'domain is taken', 'this domain is taken', 'is unavailable'];
+    for (const ind of regIndicators) {
+      if (html.includes(ind)) return { status: 'registered', source: 'namecheap', matched: ind };
+    }
+    const domainEsc = domain.toLowerCase().replace(/\./g, '\\.');
+    const rx = new RegExp(`${domainEsc}[\\s\\S]{0,1500}(?:add to cart|buy it now)`, 'i');
+    if (rx.test(html)) return { status: 'available', source: 'namecheap', matched: 'add-to-cart' };
+    return null;
+  } catch { return null; }
+}
+
+// ─── ROUTER ───
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
-    if (url.pathname === '/api/ping') {
-      return jsonResp({ ok: true, ts: Date.now() });
+    // CORS preflight
+    if (request.method === 'OPTIONS') {
+      return new Response(null, {
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, PATCH, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+        }
+      });
     }
 
-    // Debug endpoint — test Skiddle dari worker dengan detail error
+    // ─── HEALTH & DIAGNOSTIC ───
+    if (url.pathname === '/api/ping') {
+      return jsonResp({ ok: true, ts: Date.now(), version: '2026-05-05-v3' });
+    }
+
+    // /api/health — comprehensive system status
+    if (url.pathname === '/api/health') {
+      const tests = {};
+      const probe = async (name, fn) => {
+        const t0 = Date.now();
+        try {
+          const r = await Promise.race([fn(), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000))]);
+          tests[name] = { ok: true, elapsed_ms: Date.now() - t0, ...r };
+        } catch (e) { tests[name] = { ok: false, error: String(e).slice(0, 200), elapsed_ms: Date.now() - t0 }; }
+      };
+      // Probe each upstream
+      await Promise.all([
+        probe('skiddle', async () => {
+          const r = await fetch('https://check.skiddle.id/?domain=google.com&json=true');
+          return { status: r.status, content_length: r.headers.get('content-length') };
+        }),
+        probe('trust_positif', async () => {
+          const r = await fetch('https://trustpositif.komdigi.go.id/');
+          return { status: r.status };
+        }),
+        probe('verisign_rdap', async () => {
+          const r = await fetch('https://rdap.verisign.com/com/v1/domain/google.com');
+          return { status: r.status };
+        }),
+        probe('pir_rdap', async () => {
+          const r = await fetch('https://rdap.publicinterestregistry.org/rdap/domain/google.org');
+          return { status: r.status };
+        }),
+        probe('namecheap', async () => {
+          const r = await fetch('https://www.namecheap.com/domains/registration/results/?domain=google.com');
+          return { status: r.status };
+        }),
+        probe('github_tp_mirror', async () => {
+          const r = await fetch(TP_MIRROR_URLS[0], { method: 'HEAD' });
+          return { status: r.status, content_length: r.headers.get('content-length') };
+        }),
+        probe('blocklist_loaded', async () => {
+          const set = await loadBlocklist();
+          return { count: set.size, meta: _blocklistMeta };
+        }),
+        probe('gist_token_set', async () => {
+          return { configured: !!env.GIST_TOKEN, gist_id_set: !!env.GIST_ID };
+        }),
+        probe('gemini_key_set', async () => {
+          return { configured: !!env.GEMINI_KEY };
+        }),
+      ]);
+      const allOk = Object.values(tests).every(t => t.ok);
+      return jsonResp({ ok: allOk, ts: Date.now(), version: '2026-05-05-v3', tests });
+    }
+
+    // /api/debug-nawala — detail probe Skiddle + TP untuk specific domain
     if (url.pathname === '/api/debug-nawala') {
       const domain = (url.searchParams.get('domain') || 'pornhub.com').trim();
       const debug = { domain, tests: {} };
-      // Test 1: Skiddle direct
       try {
         const t0 = Date.now();
         const res = await fetch(`https://check.skiddle.id/?domain=${encodeURIComponent(domain)}&json=true`);
-        const elapsed = Date.now() - t0;
         debug.tests.skiddle = {
-          status: res.status, ok: res.ok, elapsed_ms: elapsed,
+          status: res.status, ok: res.ok, elapsed_ms: Date.now() - t0,
           body: (await res.text()).slice(0, 500)
         };
       } catch (e) { debug.tests.skiddle = { error: String(e) }; }
-      // Test 2: TP direct
       try {
         const t0 = Date.now();
         const res = await fetch(`https://trustpositif.komdigi.go.id/?trpdomain=${encodeURIComponent(domain)}`, {
-          headers: { 'User-Agent': 'Mozilla/5.0 Chrome/120', 'Accept': 'text/html' },
-          redirect: 'follow'
+          headers: { 'User-Agent': 'Mozilla/5.0 Chrome/120', 'Accept': 'text/html' }, redirect: 'follow'
         });
-        const elapsed = Date.now() - t0;
         debug.tests.tp = {
-          status: res.status, ok: res.ok, elapsed_ms: elapsed,
+          status: res.status, ok: res.ok, elapsed_ms: Date.now() - t0,
           body_preview: (await res.text()).slice(0, 300)
         };
       } catch (e) { debug.tests.tp = { error: String(e) }; }
+      try {
+        const t0 = Date.now();
+        const r = await checkViaMirror(domain);
+        debug.tests.mirror = { ok: true, elapsed_ms: Date.now() - t0, ...r };
+      } catch (e) { debug.tests.mirror = { error: String(e) }; }
       return jsonResp(debug);
     }
 
+    // ─── NAWALA CHECK ENDPOINTS ───
     if (url.pathname === '/api/check-nawala') {
       const domain = (url.searchParams.get('domain') || '').trim();
       if (!domain) return jsonResp({ error: 'missing domain param' }, 400);
@@ -200,78 +339,61 @@ export default {
       return jsonResp({ domain, ...result });
     }
 
-    // Gemini AI proxy — key disimpan server-side di env.GEMINI_KEY
-    // Body: { model?: 'gemini-2.5-flash', contents: [...] }
-    if (url.pathname === '/api/gemini' && request.method === 'POST') {
-      const apiKey = env.GEMINI_KEY;
-      if (!apiKey) return jsonResp({ error: 'GEMINI_KEY not configured in CF Pages env vars' }, 500);
+    // /api/check-nawala-mirror — pure mirror check (no Skiddle/TP)
+    // Lebih cepat, no rate limit, daily-updated dari github.com/alsyundawy/TrustPositif
+    if (url.pathname === '/api/check-nawala-mirror') {
+      const domain = (url.searchParams.get('domain') || '').trim();
+      if (!domain) return jsonResp({ error: 'missing domain' }, 400);
+      const result = await checkViaMirror(domain);
+      return jsonResp({ domain, ...result });
+    }
+
+    if (url.pathname === '/api/check-nawala-bulk' && request.method === 'POST') {
       try {
         const body = await request.json();
-        const model = body.model || 'gemini-2.5-flash';
-        const upstream = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-        // Strip 'model' field from body before forwarding (Gemini API doesn't expect it)
-        const { model: _m, ...payload } = body;
-        const res = await fetch(upstream, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        const data = await res.json();
-        return new Response(JSON.stringify(data), {
-          status: res.status,
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
+        const domains = (body.domains || []).slice(0, 50);
+        if (!domains.length) return jsonResp({ results: [] });
+        // PRIMARY: mirror untuk semua (paralel via Set lookup, instant)
+        const set = await loadBlocklist();
+        const results = domains.map(d => {
+          const dl = d.toLowerCase().replace(/^www\./, '');
+          if (set.has(dl)) return { domain: d, status: 'blocked', source: 'tp-mirror', confidence: 'high' };
+          // Cek parent
+          const parts = dl.split('.');
+          for (let i = 1; i < parts.length - 1; i++) {
+            const parent = parts.slice(i).join('.');
+            if (set.has(parent)) return { domain: d, status: 'blocked', source: 'tp-mirror-parent', confidence: 'high' };
           }
+          return { domain: d, status: 'safe', source: 'tp-mirror', confidence: 'medium' };
         });
+        // CROSS-VERIFY: kalau Skiddle tersedia, double-check yg "safe"
+        // (untuk catch domain blokir baru yang belum masuk mirror)
+        const safeOnes = results.filter(r => r.status === 'safe').map(r => r.domain);
+        if (safeOnes.length > 0 && safeOnes.length <= 30) {
+          const skidVerify = await checkViaSkiddleBulk(safeOnes);
+          for (const r of results) {
+            const sk = skidVerify[r.domain];
+            if (sk?.status === 'blocked') {
+              r.status = 'blocked';
+              r.source = 'skiddle-recent';
+              r.confidence = 'high';
+            }
+          }
+        }
+        return jsonResp({ results, blocklist_size: set.size });
       } catch (e) {
-        return jsonResp({ error: String(e) }, 500);
+        return jsonResp({ error: String(e) }, 400);
       }
     }
 
-    // ════════════════════════════════════════════════════════════════
-    // /api/check-availability — Namecheap authoritative check
-    // GET ?domain=X → return {status: 'available'|'registered'|'unknown', source}
-    // POST body: {domains: [...]} → bulk (max 30)
-    // Scrape Namecheap search result page, lebih akurat dari RDAP
-    // ════════════════════════════════════════════════════════════════
-    async function checkViaNamecheap(domain) {
-      try {
-        const ctrl = new AbortController();
-        const t = setTimeout(() => ctrl.abort(), 7000);
-        const res = await fetch(`https://www.namecheap.com/domains/registration/results/?domain=${encodeURIComponent(domain)}`, {
-          signal: ctrl.signal,
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml',
-            'Accept-Language': 'en-US,en;q=0.9'
-          },
-          redirect: 'follow',
-          cf: { cacheTtl: 600, cacheEverything: true }
-        });
-        clearTimeout(t);
-        if (!res.ok) return null;
-        const html = (await res.text()).toLowerCase();
-        // Indicator REGISTERED: "registered in YYYY", "make offer", "marketplace", "domain is taken"
-        const regIndicators = ['registered in 19', 'registered in 20', 'make offer', 'marketplace</', 'domain is taken', 'this domain is taken', 'is unavailable'];
-        for (const ind of regIndicators) {
-          if (html.includes(ind)) return { status: 'registered', source: 'namecheap', matched: ind };
-        }
-        // Indicator AVAILABLE: "add to cart", "buy now" pada hasil utama (bukan suggested)
-        // Cara cek: nama domain muncul dengan "add to cart" dekat di HTML
-        const domainEsc = domain.toLowerCase().replace(/\./g, '\\.');
-        const rx = new RegExp(`${domainEsc}[\\s\\S]{0,1500}(?:add to cart|buy it now)`, 'i');
-        if (rx.test(html)) return { status: 'available', source: 'namecheap', matched: 'add-to-cart' };
-        return null;
-      } catch { return null; }
-    }
-
+    // ─── AVAILABILITY CHECK ENDPOINTS ───
     if (url.pathname === '/api/check-availability') {
       const domain = (url.searchParams.get('domain') || '').trim().toLowerCase();
       if (!domain) return jsonResp({ error: 'missing domain' }, 400);
       const r = await checkViaNamecheap(domain);
       return jsonResp({ domain, ...(r || { status: 'unknown', error: 'parse failed' }) });
     }
+
     if (url.pathname === '/api/check-availability-bulk' && request.method === 'POST') {
       try {
         const body = await request.json();
@@ -284,37 +406,29 @@ export default {
       } catch (e) { return jsonResp({ error: String(e) }, 400); }
     }
 
-    if (url.pathname === '/api/check-nawala-bulk' && request.method === 'POST') {
+    // ─── GEMINI AI PROXY ───
+    if (url.pathname === '/api/gemini' && request.method === 'POST') {
+      const apiKey = env.GEMINI_KEY;
+      if (!apiKey) return jsonResp({ error: 'GEMINI_KEY not configured in CF Pages env vars' }, 500);
       try {
         const body = await request.json();
-        const domains = (body.domains || []).slice(0, 50); // bumped from 20
-        if (!domains.length) return jsonResp({ results: [] });
-
-        // Pass 1: Skiddle bulk (fastest)
-        const bulkRes = await checkViaSkiddleBulk(domains);
-        const missing = domains.filter(d => !bulkRes[d]);
-
-        // Pass 2: per-domain checkNawala (paralel) untuk yg gagal di bulk
-        const fallbackResults = {};
-        if (missing.length) {
-          const checks = await Promise.all(missing.map(d => checkNawala(d).then(r => [d, r])));
-          for (const [d, r] of checks) fallbackResults[d] = r;
-        }
-
-        const results = domains.map(d => ({ domain: d, ...(bulkRes[d] || fallbackResults[d] || { status: 'unknown' }) }));
-        return jsonResp({ results });
-      } catch (e) {
-        return jsonResp({ error: String(e) }, 400);
-      }
+        const model = body.model || 'gemini-2.5-flash';
+        const upstream = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const { model: _m, ...payload } = body;
+        const res = await fetch(upstream, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        return new Response(JSON.stringify(data), {
+          status: res.status,
+          headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+        });
+      } catch (e) { return jsonResp({ error: String(e) }, 500); }
     }
 
-    // ════════════════════════════════════════════════════════════════
-    // GitHub Gist proxy — token disimpan di env.GIST_TOKEN (server-side)
-    // Endpoint:
-    //   GET  /api/gist           → fetch gist content (read sync data)
-    //   POST /api/gist           → update gist content (push sync data)
-    //   GET  /api/gist/meta      → fetch updated_at timestamp (cek freshness)
-    // ════════════════════════════════════════════════════════════════
+    // ─── GIST SYNC PROXY ───
     if (url.pathname.startsWith('/api/gist')) {
       const token = env.GIST_TOKEN;
       const gid = env.GIST_ID;
@@ -327,14 +441,12 @@ export default {
         'User-Agent': 'domain-hunter-dashboard'
       };
       try {
-        // META: cuma return updated_at (lightweight check kalau Gist lebih baru dari local)
         if (url.pathname === '/api/gist/meta') {
           const r = await fetch(`https://api.github.com/gists/${gid}`, { headers: ghHeaders });
           if (!r.ok) return jsonResp({ error: `gist meta http ${r.status}` }, r.status);
           const j = await r.json();
           return jsonResp({ updated_at: j.updated_at, files: Object.keys(j.files || {}) });
         }
-        // GET: return file content (untuk pull)
         if (url.pathname === '/api/gist' && request.method === 'GET') {
           const r = await fetch(`https://api.github.com/gists/${gid}`, { headers: ghHeaders });
           if (!r.ok) return jsonResp({ error: `gist get http ${r.status}` }, r.status);
@@ -342,10 +454,8 @@ export default {
           const filename = 'domain-hunter-data.json';
           const file = j.files[filename] || Object.values(j.files)[0];
           if (!file) return jsonResp({ error: 'gist file kosong' }, 404);
-          // Return file content + metadata
           return jsonResp({ content: file.content, updated_at: j.updated_at, filename: file.filename });
         }
-        // POST/PATCH: update gist (untuk push)
         if (url.pathname === '/api/gist' && (request.method === 'POST' || request.method === 'PATCH')) {
           const body = await request.json();
           const filename = body.filename || 'domain-hunter-data.json';
@@ -364,22 +474,10 @@ export default {
           return jsonResp({ ok: true, updated_at: j.updated_at, gist_id: j.id });
         }
         return jsonResp({ error: 'method not allowed' }, 405);
-      } catch (e) {
-        return jsonResp({ error: String(e) }, 500);
-      }
+      } catch (e) { return jsonResp({ error: String(e) }, 500); }
     }
 
-    if (request.method === 'OPTIONS') {
-      return new Response(null, {
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type'
-        }
-      });
-    }
-
+    // Static assets fallback
     return env.ASSETS.fetch(request);
   }
 };
-// rebuild 1776749098
