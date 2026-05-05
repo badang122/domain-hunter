@@ -56,25 +56,22 @@ function jsonResp(obj, status = 200, extraHeaders = {}) {
 // Avoids CPU-intensive Set parsing that hits free tier 10ms limit.
 
 const TP_MIRROR_PRIMARY = TP_MIRROR_URLS[0];
-let _mirrorSize = null; // cached file size
 
+// Selalu fetch fresh size (~30-50ms, no module-level cache) — avoid stale value
+// dari isolate cache lama. Range bytes=0-0 ringan dan akurat.
 async function getMirrorSize() {
-  if (_mirrorSize) return _mirrorSize;
   try {
-    // Range request forces Content-Range header dengan total size: "bytes 0-0/9999999"
     const r = await fetch(TP_MIRROR_PRIMARY, {
-      headers: { 'Range': 'bytes=0-0' },
-      cf: { cacheTtl: 86400, cacheEverything: true }
+      headers: { 'Range': 'bytes=0-0' }
     });
     if (r.status !== 206 && r.status !== 200) return null;
-    const cr = r.headers.get('content-range'); // e.g. "bytes 0-0/9876543"
+    const cr = r.headers.get('content-range'); // "bytes 0-0/SIZE"
     if (cr) {
       const m = cr.match(/\/(\d+)$/);
-      if (m) { _mirrorSize = parseInt(m[1]); return _mirrorSize; }
+      if (m) return parseInt(m[1]);
     }
-    // Fallback: parse content-length kalau ada
     const cl = parseInt(r.headers.get('content-length') || '0');
-    if (cl > 0 && r.status === 200) { _mirrorSize = cl; return _mirrorSize; }
+    if (cl > 0 && r.status === 200) return cl;
     return null;
   } catch { return null; }
 }
