@@ -37,7 +37,7 @@
   }
   /* Light mode overrides — AGGRESSIVE readability fix */
   body.light {
-    background: #f1f5f9;
+    background: #e8edf3;        /* darker base — bukan slate-100 yg terlalu pucat */
     color: #0f172a;
   }
   /* Default ALL text elements to dark — exceptions handled later */
@@ -47,15 +47,16 @@
   body.light .quick-link, body.light .field-label, body.light .filter-label {
     color: #0f172a;
   }
+  /* Off-white panels/cards/modals — tidak terlalu putih terang */
   body.light .panel, body.light .modal {
-    background: #ffffff !important;
+    background: #f5f7fa !important;   /* off-white slate, mata gak silau */
     color: #0f172a;
-    border-color: rgba(0,0,0,0.1);
+    border-color: rgba(15,23,42,0.10);
   }
   body.light .stat-card {
-    background: #ffffff !important;
+    background: #f5f7fa !important;
     color: #0f172a;
-    border-color: rgba(0,0,0,0.1);
+    border-color: rgba(15,23,42,0.10);
   }
   body.light h1, body.light h2, body.light h3, body.light h4, body.light h5, body.light h6 {
     color: #1e1b4b !important;
@@ -67,13 +68,13 @@
   body.light td, body.light th { color: #0f172a; }
   body.light input[type="text"], body.light input[type="number"], body.light input[type="password"],
   body.light input[type="date"], body.light input[type="search"], body.light textarea, body.light select {
-    background: #ffffff !important;
+    background: #fafbfc !important;
     color: #0f172a !important;
-    border: 1px solid rgba(0,0,0,0.15) !important;
+    border: 1px solid rgba(15,23,42,0.15) !important;
   }
   body.light input::placeholder, body.light textarea::placeholder { color: #94a3b8 !important; }
   body.light code { background: #f1f5f9; color: #0f172a; padding: 1px 4px; border-radius: 3px; }
-  body.light .quick-link { background: #ffffff; color: #0f172a; }
+  body.light .quick-link { background: #f5f7fa; color: #0f172a; }
   body.light .muted, body.light [style*="color:var(--muted)"] { color: #475569 !important; }
   /* Preserve: button colored backgrounds must keep white text */
   body.light .btn-primary, body.light .btn-primary *,
@@ -106,27 +107,27 @@
   body.light .stat-value.bad { color: #b91c1c !important; }
   /* Quick links colored icons preserved */
   body.light .quick-link.ahrefs, body.light .quick-link.domcop, body.light .quick-link.dapa,
-  body.light .quick-link.nawala, body.light .quick-link.moz { color: #0f172a !important; background: #ffffff !important; }
+  body.light .quick-link.nawala, body.light .quick-link.moz { color: #0f172a !important; background: #f5f7fa !important; }
   /* Muted text in light mode */
   body.light [style*="var(--muted)"], body.light .hint { color: #475569 !important; }
   /* Hint tip at bottom */
   body.light p.hint, body.light .add-form-row + p { color: #475569 !important; }
   /* Tabel header + cells — light mode override (kalahkan solid dark hex dari dark mode) */
   body.light th { background: #e2e8f0 !important; color: #1e1b4b !important; border-bottom-color: rgba(15,23,42,0.15) !important; }
-  body.light tbody td { background: #ffffff !important; color: #1e293b !important; border-bottom-color: rgba(15,23,42,0.08) !important; border-right-color: rgba(15,23,42,0.06) !important; }
-  body.light tbody tr:nth-child(even) td { background: #f8fafc !important; }
-  body.light tbody tr:hover td { background: #eef2ff !important; }
+  body.light tbody td { background: #f5f7fa !important; color: #1e293b !important; border-bottom-color: rgba(15,23,42,0.08) !important; border-right-color: rgba(15,23,42,0.06) !important; }
+  body.light tbody tr:nth-child(even) td { background: #eef2f7 !important; }
+  body.light tbody tr:hover td { background: #e3eaf5 !important; }
   body.light tbody td * { color: #1e293b; }
   body.light table { border-color: rgba(15,23,42,0.12) !important; box-shadow: 0 1px 3px rgba(15,23,42,0.06) !important; }
   /* Stat cards: bayangan halus + border */
   body.light .stat-card { box-shadow: 0 1px 3px rgba(15,23,42,0.04), 0 1px 2px rgba(15,23,42,0.06) !important; }
   body.light .stat-label { color: #64748b !important; }
   /* Pill expiry status di light mode */
-  body.light .exp-pill { background: #ffffff !important; border-color: rgba(15,23,42,0.12) !important; color: #1e293b; }
+  body.light .exp-pill { background: #f5f7fa !important; border-color: rgba(15,23,42,0.12) !important; color: #1e293b; }
   body.light .exp-pill:hover { background: #f8fafc !important; }
   body.light .exp-pill.active { background: #eef2ff !important; border-color: #6366f1 !important; }
   /* Form section di Add Domain */
-  body.light .form-section { background: #ffffff !important; border-color: rgba(15,23,42,0.10) !important; }
+  body.light .form-section { background: #f5f7fa !important; border-color: rgba(15,23,42,0.10) !important; }
   /* CALM light mode — semua form section seragam */
   body.light .form-section.moz, body.light .form-section.ahrefs, body.light .form-section.basic {
     background: #f8fafc !important; border-color: rgba(15,23,42,0.10) !important;
