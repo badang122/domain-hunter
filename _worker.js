@@ -30,11 +30,11 @@ const SAFE_KEYWORDS = [
 ];
 
 // GitHub TP mirror sources — alsyundawy/TrustPositif (updated daily)
-// Pakai categorized files (porn + gambling) untuk balance size vs coverage
-// Ini menutup ~80% Trust Positif blocking (porn & judi adalah kategori utama)
+// Pakai porn list saja (9MB) supaya muat di CF Worker free tier CPU limit (10ms-50ms)
+// Gambling list 29MB akan exceed CPU limit saat parsing.
+// Coverage ~50% TP blocking (porn = kategori utama). Yg miss → fallback Skiddle/TP.
 const TP_MIRROR_URLS = [
   'https://raw.githubusercontent.com/alsyundawy/TrustPositif/master/alsyundawy_porn_v2.txt',
-  'https://raw.githubusercontent.com/alsyundawy/TrustPositif/master/alsyundawy_gambling_v2.txt',
 ];
 
 function jsonResp(obj, status = 200, extraHeaders = {}) {
@@ -49,57 +49,86 @@ function jsonResp(obj, status = 200, extraHeaders = {}) {
   });
 }
 
-// ─── TP MIRROR LOADER (lazy singleton, reused per isolate) ───
-let _blocklistPromise = null;
-let _blocklistMeta = { sources: [], totalDomains: 0, loadedAt: 0, errors: [] };
-async function loadBlocklist() {
-  if (_blocklistPromise) return _blocklistPromise;
-  _blocklistPromise = (async () => {
-    const set = new Set();
-    const meta = { sources: [], totalDomains: 0, loadedAt: Date.now(), errors: [] };
-    for (const url of TP_MIRROR_URLS) {
-      try {
-        const t0 = Date.now();
-        const res = await fetch(url, {
-          cf: { cacheTtl: 86400, cacheEverything: true },
-          headers: { 'User-Agent': 'domain-hunter-dashboard' }
-        });
-        const elapsed = Date.now() - t0;
-        if (!res.ok) {
-          meta.errors.push({ url, status: res.status, elapsed_ms: elapsed });
-          continue;
-        }
-        const text = await res.text();
-        let added = 0;
-        for (const line of text.split('\n')) {
-          const d = line.trim().toLowerCase();
-          if (d && !d.startsWith('#') && !d.startsWith('!')) {
-            set.add(d);
-            added++;
-          }
-        }
-        meta.sources.push({ url, count: added, size_bytes: text.length, elapsed_ms: elapsed });
-      } catch (e) {
-        meta.errors.push({ url, error: String(e).slice(0, 200) });
-      }
-    }
-    meta.totalDomains = set.size;
-    _blocklistMeta = meta;
-    return set;
-  })();
-  return _blocklistPromise;
+// ─── TP MIRROR — HTTP RANGE BINARY SEARCH (no parsing, CPU-friendly) ───
+// File alsyundawy_porn_v2.txt is sorted alphabetically. Binary search via
+// HTTP Range requests = ~25 sub-requests × 512 bytes = ~12KB total.
+// CF caches each range at edge → repeat queries instant.
+// Avoids CPU-intensive Set parsing that hits free tier 10ms limit.
+
+const TP_MIRROR_PRIMARY = TP_MIRROR_URLS[0];
+let _mirrorSize = null; // cached file size
+
+async function getMirrorSize() {
+  if (_mirrorSize) return _mirrorSize;
+  try {
+    const r = await fetch(TP_MIRROR_PRIMARY, {
+      method: 'HEAD',
+      cf: { cacheTtl: 86400, cacheEverything: true }
+    });
+    const len = parseInt(r.headers.get('content-length') || '0');
+    if (len > 0) _mirrorSize = len;
+    return _mirrorSize;
+  } catch { return null; }
 }
 
 async function checkViaMirror(domain) {
-  const set = await loadBlocklist();
-  const d = domain.toLowerCase().replace(/^www\./, '');
-  if (set.has(d)) return { status: 'blocked', source: 'tp-mirror', confidence: 'high' };
-  // Cek juga parent domain (mis. evil.example.com → cek example.com)
-  const parts = d.split('.');
-  for (let i = 1; i < parts.length - 1; i++) {
-    const parent = parts.slice(i).join('.');
-    if (set.has(parent)) return { status: 'blocked', source: 'tp-mirror-parent', matched_parent: parent, confidence: 'high' };
+  const size = await getMirrorSize();
+  if (!size) return null;
+  const target = domain.toLowerCase().replace(/^www\./, '');
+
+  let lo = 0, hi = size - 1;
+  // 25 iterations = handles up to 33M lines (way more than needed)
+  for (let iter = 0; iter < 25 && hi - lo > 512; iter++) {
+    const mid = Math.floor((lo + hi) / 2);
+    const start = Math.max(0, mid - 256);
+    const end = Math.min(size - 1, mid + 256);
+    try {
+      const r = await fetch(TP_MIRROR_PRIMARY, {
+        headers: { 'Range': `bytes=${start}-${end}` },
+        cf: { cacheTtl: 86400, cacheEverything: true }
+      });
+      if (r.status !== 206 && r.status !== 200) return null;
+      const chunk = await r.text();
+      // Skip partial first line, take complete lines
+      const firstNL = chunk.indexOf('\n');
+      const lastNL = chunk.lastIndexOf('\n');
+      if (firstNL < 0 || firstNL === lastNL) {
+        lo = end + 1; continue;
+      }
+      const lines = chunk.substring(firstNL + 1, lastNL).split('\n');
+      // Check direct match
+      for (const line of lines) {
+        const ln = line.trim().toLowerCase();
+        if (ln === target) return { status: 'blocked', source: 'tp-mirror', confidence: 'high' };
+      }
+      // Direction decision via lexicographic comparison
+      const midLine = lines[Math.floor(lines.length / 2)].trim().toLowerCase();
+      if (!midLine) { lo = end + 1; continue; }
+      if (target < midLine) hi = start;
+      else lo = end;
+    } catch { return null; }
   }
+  // Final check: fetch tight range and search linearly
+  try {
+    const r = await fetch(TP_MIRROR_PRIMARY, {
+      headers: { 'Range': `bytes=${lo}-${Math.min(hi, lo + 2048)}` },
+      cf: { cacheTtl: 86400, cacheEverything: true }
+    });
+    if (r.status !== 206 && r.status !== 200) return null;
+    const chunk = await r.text();
+    if (chunk.toLowerCase().includes('\n' + target + '\n') ||
+        chunk.toLowerCase().startsWith(target + '\n')) {
+      return { status: 'blocked', source: 'tp-mirror', confidence: 'high' };
+    }
+    // Cek parent domain juga
+    const parts = target.split('.');
+    for (let i = 1; i < parts.length - 1; i++) {
+      const parent = parts.slice(i).join('.');
+      if (chunk.toLowerCase().includes('\n' + parent + '\n')) {
+        return { status: 'blocked', source: 'tp-mirror-parent', matched_parent: parent, confidence: 'high' };
+      }
+    }
+  } catch {}
   return { status: 'safe', source: 'tp-mirror', confidence: 'medium' };
 }
 
@@ -286,9 +315,9 @@ export default {
           const r = await fetch(TP_MIRROR_URLS[0], { method: 'HEAD' });
           return { status: r.status, content_length: r.headers.get('content-length') };
         }),
-        probe('blocklist_loaded', async () => {
-          const set = await loadBlocklist();
-          return { count: set.size, meta: _blocklistMeta };
+        probe('mirror_size', async () => {
+          const size = await getMirrorSize();
+          return { size_bytes: size, ready: !!size };
         }),
         probe('gist_token_set', async () => {
           return { configured: !!env.GIST_TOKEN, gist_id_set: !!env.GIST_ID };
@@ -351,36 +380,31 @@ export default {
     if (url.pathname === '/api/check-nawala-bulk' && request.method === 'POST') {
       try {
         const body = await request.json();
-        const domains = (body.domains || []).slice(0, 50);
+        const domains = (body.domains || []).slice(0, 30); // reduced from 50 (mirror = 25 sub-req/domain)
         if (!domains.length) return jsonResp({ results: [] });
-        // PRIMARY: mirror untuk semua (paralel via Set lookup, instant)
-        const set = await loadBlocklist();
-        const results = domains.map(d => {
-          const dl = d.toLowerCase().replace(/^www\./, '');
-          if (set.has(dl)) return { domain: d, status: 'blocked', source: 'tp-mirror', confidence: 'high' };
-          // Cek parent
-          const parts = dl.split('.');
-          for (let i = 1; i < parts.length - 1; i++) {
-            const parent = parts.slice(i).join('.');
-            if (set.has(parent)) return { domain: d, status: 'blocked', source: 'tp-mirror-parent', confidence: 'high' };
-          }
-          return { domain: d, status: 'safe', source: 'tp-mirror', confidence: 'medium' };
-        });
-        // CROSS-VERIFY: kalau Skiddle tersedia, double-check yg "safe"
-        // (untuk catch domain blokir baru yang belum masuk mirror)
-        const safeOnes = results.filter(r => r.status === 'safe').map(r => r.domain);
-        if (safeOnes.length > 0 && safeOnes.length <= 30) {
-          const skidVerify = await checkViaSkiddleBulk(safeOnes);
-          for (const r of results) {
-            const sk = skidVerify[r.domain];
-            if (sk?.status === 'blocked') {
-              r.status = 'blocked';
-              r.source = 'skiddle-recent';
-              r.confidence = 'high';
-            }
+        // PASS 1: Skiddle bulk (kalau alive, paling efisien — 1 sub-req)
+        const skidResults = await checkViaSkiddleBulk(domains);
+        // PASS 2: untuk yg gagal di Skiddle, pakai mirror (HTTP Range search per-domain)
+        const missing = domains.filter(d => !skidResults[d]);
+        const mirrorResults = {};
+        if (missing.length > 0 && missing.length <= 5) {
+          // Per-domain mirror sequential (max 5 untuk avoid sub-req limit)
+          for (const d of missing) {
+            try {
+              const r = await checkViaMirror(d);
+              if (r) mirrorResults[d] = r;
+            } catch {}
           }
         }
-        return jsonResp({ results, blocklist_size: set.size });
+        // Compose
+        const results = domains.map(d => {
+          const sk = skidResults[d];
+          const mr = mirrorResults[d];
+          if (sk) return { domain: d, ...sk };
+          if (mr) return { domain: d, ...mr };
+          return { domain: d, status: 'unknown', error: 'all sources failed' };
+        });
+        return jsonResp({ results });
       } catch (e) {
         return jsonResp({ error: String(e) }, 400);
       }
