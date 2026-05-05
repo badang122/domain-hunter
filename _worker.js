@@ -55,13 +55,20 @@ function jsonResp(obj, status = 200, extraHeaders = {}) {
 // CF caches each range at edge → repeat queries instant.
 // Avoids CPU-intensive Set parsing that hits free tier 10ms limit.
 
+// Cache-buster: changes daily, force CF edge to refetch dari GitHub
+function _mirrorUrl() {
+  const day = Math.floor(Date.now() / 86400000);
+  return `${TP_MIRROR_URLS[0]}?_v=${day}`;
+}
+
+// Backwards-compat const for existing references
 const TP_MIRROR_PRIMARY = TP_MIRROR_URLS[0];
 
 // Selalu fetch fresh size (~30-50ms, no module-level cache) — avoid stale value
 // dari isolate cache lama. Range bytes=0-0 ringan dan akurat.
 async function getMirrorSize() {
   try {
-    const r = await fetch(TP_MIRROR_PRIMARY, {
+    const r = await fetch(_mirrorUrl(), {
       headers: { 'Range': 'bytes=0-0' }
     });
     if (r.status !== 206 && r.status !== 200) return null;
@@ -89,7 +96,7 @@ async function checkViaMirror(domain) {
     const end = Math.min(size - 1, mid + 512);
     try {
       // No cf cache — chunks tergantung file content version, hindari stale
-      const r = await fetch(TP_MIRROR_PRIMARY, {
+      const r = await fetch(_mirrorUrl(), {
         headers: { 'Range': `bytes=${start}-${end}` }
       });
       if (r.status !== 206 && r.status !== 200) return null;
@@ -122,7 +129,7 @@ async function checkViaMirror(domain) {
   }
   // Final linear scan in narrowed range (max 4KB)
   try {
-    const r = await fetch(TP_MIRROR_PRIMARY, {
+    const r = await fetch(_mirrorUrl(), {
       headers: { 'Range': `bytes=${Math.max(0, lo - 256)}-${Math.min(size - 1, hi + 256 + 4096)}` }
     });
     if (r.status !== 206 && r.status !== 200) return null;
