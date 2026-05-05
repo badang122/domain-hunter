@@ -3048,6 +3048,118 @@ const NAWALA_BLOCK_IPS = [
 
 // Primary method: Skiddle API (Indonesia, server-side check vs Trust Positif)
 // API: https://check.skiddle.id/?domain=X&json=true
+// ═══════════════════════════════════════════════════════════════
+// CLIENT-SIDE TP MIRROR — download once, cache IDB, in-memory Set
+// Browser memory & CPU lebih besar dari CF Worker free tier.
+// alsyundawy/TrustPositif: porn (9MB) + gambling (29MB) sources.
+// O(1) Set lookup × 700 domain = instant.
+// ═══════════════════════════════════════════════════════════════
+const TP_MIRROR_SOURCES_CLIENT = [
+  'https://raw.githubusercontent.com/alsyundawy/TrustPositif/master/alsyundawy_porn_v2.txt',
+  'https://raw.githubusercontent.com/alsyundawy/TrustPositif/master/alsyundawy_gambling_v2.txt',
+];
+let _tpBlocklistSet = null; // in-memory cache per session
+let _tpBlocklistMeta = null;
+
+async function _idbGetBlob(key) {
+  return new Promise((resolve) => {
+    try {
+      const req = indexedDB.open('domainhunter_db', 2);
+      req.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains('tp_blocklist')) db.createObjectStore('tp_blocklist');
+      };
+      req.onsuccess = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains('tp_blocklist')) { resolve(null); return; }
+        const tx = db.transaction('tp_blocklist', 'readonly').objectStore('tp_blocklist').get(key);
+        tx.onsuccess = () => resolve(tx.result || null);
+        tx.onerror = () => resolve(null);
+      };
+      req.onerror = () => resolve(null);
+    } catch { resolve(null); }
+  });
+}
+async function _idbSetBlob(key, value) {
+  return new Promise((resolve) => {
+    try {
+      const req = indexedDB.open('domainhunter_db', 2);
+      req.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains('tp_blocklist')) db.createObjectStore('tp_blocklist');
+      };
+      req.onsuccess = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains('tp_blocklist')) { resolve(false); return; }
+        const tx = db.transaction('tp_blocklist', 'readwrite').objectStore('tp_blocklist').put(value, key);
+        tx.onsuccess = () => resolve(true);
+        tx.onerror = () => resolve(false);
+      };
+      req.onerror = () => resolve(false);
+    } catch { resolve(false); }
+  });
+}
+
+async function loadTPBlocklistClient(progressCb) {
+  if (_tpBlocklistSet) return _tpBlocklistSet;
+  // Cek IDB cache dulu
+  const cached = await _idbGetBlob('blocklist_v1');
+  const cachedAge = cached ? (Date.now() - (cached.savedAt || 0)) : Infinity;
+  const ONE_DAY = 86400 * 1000;
+  if (cached && cachedAge < ONE_DAY && cached.text) {
+    if (progressCb) progressCb(`📦 Cached blocklist (${(cached.text.length/1024/1024).toFixed(1)}MB, age ${Math.round(cachedAge/3600000)}h)`);
+    const set = new Set();
+    for (const line of cached.text.split('\n')) {
+      const d = line.trim().toLowerCase();
+      if (d && !d.startsWith('#')) set.add(d);
+    }
+    _tpBlocklistSet = set;
+    _tpBlocklistMeta = { source: 'idb-cache', count: set.size, savedAt: cached.savedAt };
+    if (progressCb) progressCb(`✅ Loaded ${set.size.toLocaleString('id-ID')} domains dari cache`);
+    return set;
+  }
+  // Fresh download
+  if (progressCb) progressCb('📥 Downloading blocklist dari GitHub mirror...');
+  const set = new Set();
+  let totalText = '';
+  for (const url of TP_MIRROR_SOURCES_CLIENT) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) continue;
+      const text = await res.text();
+      totalText += text + '\n';
+      const filename = url.split('/').pop();
+      if (progressCb) progressCb(`📥 ${filename}: ${(text.length/1024/1024).toFixed(1)}MB`);
+      for (const line of text.split('\n')) {
+        const d = line.trim().toLowerCase();
+        if (d && !d.startsWith('#')) set.add(d);
+      }
+    } catch (e) {
+      if (progressCb) progressCb(`⚠️ ${url.split('/').pop()}: ${e.message}`);
+    }
+  }
+  // Cache ke IDB
+  if (totalText.length > 1000) {
+    await _idbSetBlob('blocklist_v1', { text: totalText, savedAt: Date.now() });
+  }
+  _tpBlocklistSet = set;
+  _tpBlocklistMeta = { source: 'fresh', count: set.size, savedAt: Date.now() };
+  if (progressCb) progressCb(`✅ Loaded ${set.size.toLocaleString('id-ID')} domains (cached untuk 24 jam)`);
+  return set;
+}
+
+function checkNawalaViaTPMirror(domain) {
+  if (!_tpBlocklistSet) return null;
+  const d = domain.toLowerCase().replace(/^www\./, '');
+  if (_tpBlocklistSet.has(d)) return 'blocked';
+  // Parent domain check
+  const parts = d.split('.');
+  for (let i = 1; i < parts.length - 1; i++) {
+    if (_tpBlocklistSet.has(parts.slice(i).join('.'))) return 'blocked';
+  }
+  return 'safe';
+}
+
 async function checkNawalaViaSkiddle(domain) {
   try {
     const controller = new AbortController();
@@ -3293,29 +3405,42 @@ async function autoGenerateAllNawala() {
   const failedDomains = [];
   const started = Date.now();
 
-  // PASS 1 — Server-side bulk endpoint (TP Mirror PRIMARY + Skiddle cross-verify)
-  // Worker pakai alsyundawy/TrustPositif GitHub mirror — daily updated, no rate limit.
-  // Plus cross-verify "safe" results via Skiddle untuk catch entries baru.
+  const progBox2 = document.getElementById('nwProgress');
+  const progTxt2 = document.getElementById('nwProgressText');
+
+  // PASS 0 — Load TP Mirror blocklist client-side (sekali, cached IDB 24h)
+  // Browser memory unlimited vs CF Worker free tier 10ms CPU. Real solution.
+  if (progTxt2) progTxt2.innerHTML = '📦 Loading Trust Positif mirror...';
+  await loadTPBlocklistClient(msg => { if (progTxt2) progTxt2.innerHTML = msg; });
+  const blocklistReady = !!_tpBlocklistSet;
+
+  // PASS 1 — Pakai client-side mirror (instant Set lookup)
   for (let i = 0; i < unchecked.length; i += BATCH_SIZE) {
     const batch = unchecked.slice(i, i + BATCH_SIZE);
     let batchResults = {};
 
-    // Server endpoint: /api/check-nawala-bulk pakai TP mirror primary
-    try {
-      const res = await fetch('/api/check-nawala-bulk', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ domains: batch })
-      });
-      if (res.ok) {
-        const j = await res.json();
-        for (const r of (j.results || [])) {
-          if (r.status === 'blocked' || r.status === 'safe') {
-            batchResults[r.domain] = r.status;
+    // CLIENT MIRROR LOOKUP — O(1) per domain
+    if (blocklistReady) {
+      for (const d of batch) {
+        const r = checkNawalaViaTPMirror(d);
+        if (r === 'blocked' || r === 'safe') batchResults[d] = r;
+      }
+    } else {
+      // Mirror gagal load — fallback ke server bulk (pakai Skiddle)
+      try {
+        const res = await fetch('/api/check-nawala-bulk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ domains: batch })
+        });
+        if (res.ok) {
+          const j = await res.json();
+          for (const r of (j.results || [])) {
+            if (r.status === 'blocked' || r.status === 'safe') batchResults[r.domain] = r.status;
           }
         }
-      }
-    } catch (e) { console.warn('[nawala] server bulk failed:', e); }
+      } catch (e) { console.warn('[nawala] server bulk failed:', e); }
+    }
 
     // PASS 2 — Untuk yg gagal di server, fallback Skiddle bulk client (kalau Skiddle alive)
     const stillFailing = batch.filter(d => !batchResults[d]);
