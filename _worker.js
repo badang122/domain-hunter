@@ -61,13 +61,21 @@ let _mirrorSize = null; // cached file size
 async function getMirrorSize() {
   if (_mirrorSize) return _mirrorSize;
   try {
+    // Range request forces Content-Range header dengan total size: "bytes 0-0/9999999"
     const r = await fetch(TP_MIRROR_PRIMARY, {
-      method: 'HEAD',
+      headers: { 'Range': 'bytes=0-0' },
       cf: { cacheTtl: 86400, cacheEverything: true }
     });
-    const len = parseInt(r.headers.get('content-length') || '0');
-    if (len > 0) _mirrorSize = len;
-    return _mirrorSize;
+    if (r.status !== 206 && r.status !== 200) return null;
+    const cr = r.headers.get('content-range'); // e.g. "bytes 0-0/9876543"
+    if (cr) {
+      const m = cr.match(/\/(\d+)$/);
+      if (m) { _mirrorSize = parseInt(m[1]); return _mirrorSize; }
+    }
+    // Fallback: parse content-length kalau ada
+    const cl = parseInt(r.headers.get('content-length') || '0');
+    if (cl > 0 && r.status === 200) { _mirrorSize = cl; return _mirrorSize; }
+    return null;
   } catch { return null; }
 }
 
