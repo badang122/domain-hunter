@@ -60,7 +60,7 @@
   body.light h1, body.light h2, body.light h3, body.light h4, body.light h5, body.light h6 {
     color: #1e1b4b !important;
   }
-  body.light h1 { background: linear-gradient(135deg,#4f46e5,#8b5cf6,#ec4899); -webkit-background-clip: text; background-clip: text; color: transparent !important; }
+  body.light h1 { color: #1e293b !important; -webkit-text-fill-color: #1e293b !important; background: none !important; }
   body.light label, body.light p, body.light .field-label, body.light .filter-label, body.light .hint {
     color: #334155 !important;
   }
@@ -127,9 +127,10 @@
   body.light .exp-pill.active { background: #eef2ff !important; border-color: #6366f1 !important; }
   /* Form section di Add Domain */
   body.light .form-section { background: #ffffff !important; border-color: rgba(15,23,42,0.10) !important; }
-  body.light .form-section.moz    { background: #eff6ff !important; border-color: rgba(59,130,246,0.25) !important; }
-  body.light .form-section.ahrefs { background: #ecfdf5 !important; border-color: rgba(16,185,129,0.25) !important; }
-  body.light .form-section.basic  { background: #faf5ff !important; border-color: rgba(139,92,246,0.25) !important; }
+  /* CALM light mode — semua form section seragam */
+  body.light .form-section.moz, body.light .form-section.ahrefs, body.light .form-section.basic {
+    background: #f8fafc !important; border-color: rgba(15,23,42,0.10) !important;
+  }
   body.light .form-section-title { color: #1e293b !important; }
   /* Footer persist indicator */
   body.light #persistIndicator { color: #475569 !important; }
@@ -189,9 +190,7 @@
     font-size: 32px;
     font-weight: 800;
     letter-spacing: -0.02em;
-    background: var(--gradient);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    color: #cbd5e1;
     margin-bottom: 4px;
   }
   h2 { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
@@ -274,12 +273,8 @@
   .stat-card:hover::after { opacity: 1; }
 
   /* Different gradient colors per stat card */
-  .stat-card:nth-child(1)::before { background: linear-gradient(90deg, #6366f1, #8b5cf6); }
-  .stat-card:nth-child(2)::before { background: linear-gradient(90deg, #10b981, #059669); }
-  .stat-card:nth-child(3)::before { background: linear-gradient(90deg, #f59e0b, #d97706); }
-  .stat-card:nth-child(4)::before { background: linear-gradient(90deg, #ec4899, #be185d); }
-  .stat-card:nth-child(5)::before { background: linear-gradient(90deg, #06b6d4, #0891b2); }
-  .stat-card:nth-child(6)::before { background: linear-gradient(90deg, #f97316, #ea580c); }
+  /* CALM MODE — semua stat card top accent pakai 1 warna (indigo soft) */
+  .stat-card::before { background: rgba(99,102,241,0.5) !important; }
 
   .stat-label {
     color: var(--muted);
@@ -548,11 +543,9 @@
     transition: all 0.2s;
   }
   .quick-link:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); border-color: var(--border-strong); }
-  .quick-link.ahrefs { border-left: 3px solid #f97316; }
-  .quick-link.domcop { border-left: 3px solid #10b981; }
-  .quick-link.dapa { border-left: 3px solid #3b82f6; }
-  .quick-link.nawala { border-left: 3px solid #dc2626; }
-  .quick-link.moz { border-left: 3px solid #06b6d4; }
+  /* CALM — semua quick link border slate seragam, hanya icon emoji yg beri warna */
+  .quick-link.ahrefs, .quick-link.domcop, .quick-link.dapa,
+  .quick-link.nawala, .quick-link.moz, .quick-link.namecheap { border-left: 3px solid rgba(148,163,184,0.4); }
 
   /* Row action buttons — redesigned for cleaner look */
   .row-actions {
@@ -630,9 +623,11 @@
     background: rgba(255,255,255,0.02);
     margin-top: 4px;
   }
-  .form-section.moz   { background: linear-gradient(180deg, rgba(59,130,246,0.07), rgba(59,130,246,0.02)); border-color: rgba(59,130,246,0.25); }
-  .form-section.ahrefs{ background: linear-gradient(180deg, rgba(16,185,129,0.07), rgba(16,185,129,0.02)); border-color: rgba(16,185,129,0.28); }
-  .form-section.basic { background: linear-gradient(180deg, rgba(139,92,246,0.07), rgba(139,92,246,0.02)); border-color: rgba(139,92,246,0.28); }
+  /* CALM — semua form section pakai bg neutral slate, dot saja yg colored sebagai indicator */
+  .form-section.moz, .form-section.ahrefs, .form-section.basic {
+    background: rgba(255,255,255,0.02);
+    border-color: rgba(148,163,184,0.20);
+  }
   .form-section-title {
     display: flex; align-items: center; gap: 8px;
     font-size: 12px; font-weight: 800; letter-spacing: 0.04em;
@@ -649,9 +644,7 @@
   .form-section-hint { font-size: 11px; color: var(--muted); margin-top: 6px; }
 
   body.light .form-section { background: rgba(255,255,255,0.6); border-color: rgba(0,0,0,0.08); }
-  body.light .form-section.moz   { background: linear-gradient(180deg, rgba(59,130,246,0.10), rgba(59,130,246,0.03)); }
-  body.light .form-section.ahrefs{ background: linear-gradient(180deg, rgba(16,185,129,0.10), rgba(16,185,129,0.03)); }
-  body.light .form-section.basic { background: linear-gradient(180deg, rgba(139,92,246,0.10), rgba(139,92,246,0.03)); }
+  /* CALM — gradients removed, semua form section seragam neutral */
   body.light .form-section-title { color: #1f2937 !important; }
 
   .form-actions {
@@ -746,15 +739,15 @@
   body * { color: inherit; }
   /* Tabel sengaja sedikit redup biar gak silau */
   tbody td { color: #cbd5e1; }
-  /* Hanya text penting yg pakai warna saturated */
-  .good { color: #6ee7b7 !important; }
-  .mid { color: #fcd34d !important; }
-  .bad, .score.s-low { color: #fca5a5 !important; }
-  .score.s-high { color: #6ee7b7 !important; }
-  .score.s-mid { color: #fcd34d !important; }
+  /* CALM — text indikator desaturated, masih bisa dibedakan tapi gak silau */
+  .good { color: #86efac !important; }      /* hijau soft */
+  .mid { color: #fde68a !important; }       /* kuning soft */
+  .bad, .score.s-low { color: #fecaca !important; }  /* merah soft */
+  .score.s-high { color: #86efac !important; }
+  .score.s-mid { color: #fde68a !important; }
   .domain, .domain * { color: #a5b4fc !important; }
   a:not(.check-link):not(.quick-link):not(.pill) { color: #93c5fd !important; }
-  h1 { -webkit-text-fill-color: transparent !important; color: transparent !important; }
+  body:not(.light) h1 { color: #cbd5e1 !important; -webkit-text-fill-color: #cbd5e1 !important; }
   input::placeholder, textarea::placeholder {
     color: rgba(255,255,255,0.85) !important;
     font-weight: 600 !important;
