@@ -236,26 +236,26 @@
   /* Stats — colorful cards */
   .stats {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 16px;
-    margin-bottom: 24px;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 10px;
+    margin-bottom: 14px;
   }
   .stat-card {
     background: var(--panel);
-    padding: 20px 22px;
-    border-radius: 16px;
+    padding: 10px 14px;
+    border-radius: 10px;
     border: 1px solid var(--border);
     box-shadow: var(--shadow-sm);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.2s ease;
     position: relative;
     overflow: hidden;
   }
   .stat-card::before {
     content: '';
     position: absolute;
-    top: 0; left: 0; right: 0; height: 4px;
+    top: 0; left: 0; right: 0; height: 2px;
     background: var(--gradient);
-    opacity: 0.8;
+    opacity: 0.7;
   }
   .stat-card::after {
     content: '';
@@ -267,8 +267,8 @@
     transition: opacity 0.3s;
   }
   .stat-card:hover {
-    transform: translateY(-4px) scale(1.01);
-    box-shadow: 0 12px 30px rgba(0,0,0,.3);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,.2);
     border-color: var(--border-strong);
   }
   .stat-card:hover::after { opacity: 1; }
@@ -279,31 +279,31 @@
 
   .stat-label {
     color: var(--muted);
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.1em;
-    margin-bottom: 12px;
+    letter-spacing: 0.06em;
+    margin-bottom: 4px;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 5px;
   }
   .stat-value {
-    font-size: 32px;
-    font-weight: 800;
-    letter-spacing: -0.03em;
-    line-height: 1;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
     color: #f1f5f9;
   }
   body.light .stat-value, body.light .stat-card .stat-value { color: #0f172a !important; }
 
   /* Add Icon before stat labels */
-  .stat-card:nth-child(1) .stat-label::before { content: '🌐'; font-size: 14px; }
-  .stat-card:nth-child(2) .stat-label::before { content: '📊'; font-size: 14px; }
-  .stat-card:nth-child(3) .stat-label::before { content: '⚡'; font-size: 14px; }
-  .stat-card:nth-child(4) .stat-label::before { content: '📅'; font-size: 14px; }
-  .stat-card:nth-child(5) .stat-label::before { content: '🏆'; font-size: 14px; }
-  .stat-card:nth-child(6) .stat-label::before { content: '🎯'; font-size: 14px; }
+  .stat-card:nth-child(1) .stat-label::before { content: '🌐'; font-size: 12px; }
+  .stat-card:nth-child(2) .stat-label::before { content: '📊'; font-size: 12px; }
+  .stat-card:nth-child(3) .stat-label::before { content: '⚡'; font-size: 12px; }
+  .stat-card:nth-child(4) .stat-label::before { content: '📅'; font-size: 12px; }
+  .stat-card:nth-child(5) .stat-label::before { content: '🏆'; font-size: 12px; }
+  .stat-card:nth-child(6) .stat-label::before { content: '🎯'; font-size: 12px; }
 
   /* Inputs */
   input, select, textarea {
@@ -933,9 +933,10 @@
     .topbar { flex-direction: column; align-items: stretch; gap: 8px; }
     .user-info { justify-content: flex-start; flex-wrap: wrap; gap: 6px; }
     .user-info button, .user-info select { padding: 6px 10px; font-size: 12px; }
-    .stats { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-    .stat-card { padding: 12px; }
-    .stat-value { font-size: 20px; }
+    .stats { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .stat-card { padding: 8px 10px; }
+    .stat-value { font-size: 16px; }
+    .stat-label { font-size: 9px; }
     .quick-links { gap: 6px; }
     .quick-link { padding: 8px 12px; font-size: 12px; }
     .panel { padding: 12px; }
