@@ -2681,12 +2681,23 @@ function render() {
         const meta = JSON.parse(localStorage.getItem('dashboard_meta') || '{}')[d.domain] || {};
         const prov = d.provider || meta.registrar || meta.provider || '';
         if (!prov) return `<td data-field="provider" data-domain="${d.domain}" style="cursor:pointer;color:var(--muted);" onclick="editProvider('${d.domain}')">📝 Set</td>`;
-        // Color per provider common
-        const colorMap = { 'namecheap':'#ff5a00','godaddy':'#0d8a00','dynadot':'#6366f1','porkbun':'#f093fb','cloudflare':'#f97316','google':'#4285f4','niagahoster':'#ef4444','hostinger':'#7c3aed','name.com':'#10b981' };
+        // CALM — provider badge soft (low saturation), bukan solid bright color
+        // Pakai bg pastel + text colored sesuai brand, border halus
+        const colorMap = {
+          'namecheap':   { bg: 'rgba(249,115,22,0.12)', tx: '#fdba74', bd: 'rgba(249,115,22,0.35)' },
+          'godaddy':     { bg: 'rgba(16,185,129,0.12)', tx: '#6ee7b7', bd: 'rgba(16,185,129,0.35)' },
+          'dynadot':     { bg: 'rgba(99,102,241,0.12)', tx: '#a5b4fc', bd: 'rgba(99,102,241,0.35)' },
+          'porkbun':     { bg: 'rgba(240,147,251,0.12)', tx: '#f0abfc', bd: 'rgba(240,147,251,0.35)' },
+          'cloudflare':  { bg: 'rgba(249,115,22,0.12)', tx: '#fdba74', bd: 'rgba(249,115,22,0.35)' },
+          'google':      { bg: 'rgba(66,133,244,0.12)', tx: '#93c5fd', bd: 'rgba(66,133,244,0.35)' },
+          'niagahoster': { bg: 'rgba(239,68,68,0.12)', tx: '#fca5a5', bd: 'rgba(239,68,68,0.35)' },
+          'hostinger':   { bg: 'rgba(124,58,237,0.12)', tx: '#c4b5fd', bd: 'rgba(124,58,237,0.35)' },
+          'name.com':    { bg: 'rgba(16,185,129,0.12)', tx: '#6ee7b7', bd: 'rgba(16,185,129,0.35)' }
+        };
         const k = prov.toLowerCase().replace(/\s+/g,'');
-        const color = Object.keys(colorMap).find(key => k.includes(key));
-        const bg = color ? colorMap[color] : '#475569';
-        return `<td data-field="provider" data-domain="${d.domain}" style="cursor:pointer;" onclick="editProvider('${d.domain}')" title="Klik untuk edit"><span style="background:${bg};color:white;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700;">${prov}</span></td>`;
+        const matched = Object.keys(colorMap).find(key => k.includes(key));
+        const c = matched ? colorMap[matched] : { bg: 'rgba(148,163,184,0.10)', tx: '#cbd5e1', bd: 'rgba(148,163,184,0.30)' };
+        return `<td data-field="provider" data-domain="${d.domain}" style="cursor:pointer;" onclick="editProvider('${d.domain}')" title="Klik untuk edit"><span style="background:${c.bg};color:${c.tx};border:1px solid ${c.bd};padding:3px 9px;border-radius:6px;font-size:11px;font-weight:600;">${prov}</span></td>`;
       })(),
       expired: (() => {
         const meta = JSON.parse(localStorage.getItem('dashboard_meta') || '{}')[d.domain] || {};
